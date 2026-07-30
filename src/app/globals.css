@@ -1,0 +1,310 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+ * Houseiana admin design tokens.
+ *
+ * The palette, radii and shadows are lifted verbatim from the approved wizard
+ * artifact so the React build is pixel-faithful to the reference. The calendar
+ * state colours come from the availability artifact.
+ *
+ * `data-theme` is always resolved to "light" or "dark" by the inline theme
+ * script before first paint, so every token has one authoritative value and
+ * there is no flash.
+ * ------------------------------------------------------------------------- */
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root,
+:root[data-theme='light'] {
+  --bg: #f5f6f7;
+  --surface: #ffffff;
+  --surface-2: #fafbfb;
+  --border: #e2e6e8;
+  --border-strong: #cfd6d9;
+  --text: #17222a;
+  --muted: #5f6f78;
+  --faint: #8a99a0;
+  /* Brand yellow. `accent` is a FILL only — it has ~1.7:1 against white, so it
+     can never carry text. `accent-ink` is the readable text/icon counterpart on
+     light surfaces, and `on-accent` is what sits on top of an accent fill. */
+  --accent: #fcc519;
+  --accent-strong: #e3ab00;
+  --accent-soft: #fef4d4;
+  --accent-ink: #8a6100;
+  --on-accent: #1a1408;
+  --ok: #157347;
+  --ok-soft: #e4f2ea;
+  --warn: #a55b09;
+  --warn-soft: #f8eede;
+  --danger: #b42318;
+  --danger-soft: #fbe9e7;
+  --info: #1d6fb8;
+  --info-soft: #e6f0fa;
+
+  /* availability calendar states */
+  --open: #1f8a5b;
+  --open-bg: #e9f6ef;
+  --low: #b7791f;
+  --low-bg: #fbf1de;
+  --sold: #c8384a;
+  --sold-bg: #fbe9eb;
+  --blocked: #6b7684;
+  --blocked-bg: #eef1f4;
+
+  --shadow-card: 0 1px 2px rgb(20 32 40 / 0.05), 0 4px 16px rgb(20 32 40 / 0.05);
+  --shadow-pop: 0 8px 28px rgb(20 32 40 / 0.14), 0 2px 6px rgb(20 32 40 / 0.08);
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0e1416;
+  --surface: #151d20;
+  --surface-2: #1a2327;
+  --border: #26343a;
+  --border-strong: #35474e;
+  --text: #e7edef;
+  --muted: #9aa9b0;
+  --faint: #6f8087;
+  /* On dark surfaces the brand yellow is itself highly readable (~10:1), so
+     `accent-ink` collapses back onto the brand colour. */
+  --accent: #fcc519;
+  --accent-strong: #ffd757;
+  --accent-soft: #3a2d08;
+  --accent-ink: #fcc519;
+  --on-accent: #1a1408;
+  --ok: #4cbf85;
+  --ok-soft: #12291f;
+  --warn: #d9973f;
+  --warn-soft: #2c2113;
+  --danger: #e5776b;
+  --danger-soft: #2c1715;
+  --info: #6aa9e0;
+  --info-soft: #12212e;
+
+  --open: #4bbd85;
+  --open-bg: #12251c;
+  --low: #d9a441;
+  --low-bg: #2a2213;
+  --sold: #e8697a;
+  --sold-bg: #2c1518;
+  --blocked: #8b98a7;
+  --blocked-bg: #1c2734;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.28);
+  --shadow-pop: 0 12px 34px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);
+  color-scheme: dark;
+}
+
+/* Fallback for users who land before the theme script runs (JS disabled). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0e1416;
+    --surface: #151d20;
+    --surface-2: #1a2327;
+    --border: #26343a;
+    --border-strong: #35474e;
+    --text: #e7edef;
+    --muted: #9aa9b0;
+    --faint: #6f8087;
+    --accent: #fcc519;
+    --accent-strong: #ffd757;
+    --accent-soft: #3a2d08;
+    --accent-ink: #fcc519;
+    --on-accent: #1a1408;
+    --ok: #4cbf85;
+    --ok-soft: #12291f;
+    --warn: #d9973f;
+    --warn-soft: #2c2113;
+    --danger: #e5776b;
+    --danger-soft: #2c1715;
+    --info: #6aa9e0;
+    --info-soft: #12212e;
+    --open: #4bbd85;
+    --open-bg: #12251c;
+    --low: #d9a441;
+    --low-bg: #2a2213;
+    --sold: #e8697a;
+    --sold-bg: #2c1518;
+    --blocked: #8b98a7;
+    --blocked-bg: #1c2734;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-on-accent: var(--on-accent);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-open: var(--open);
+  --color-open-bg: var(--open-bg);
+  --color-low: var(--low);
+  --color-low-bg: var(--low-bg);
+  --color-sold: var(--sold);
+  --color-sold-bg: var(--sold-bg);
+  --color-blocked: var(--blocked);
+  --color-blocked-bg: var(--blocked-bg);
+
+  --radius-card: 10px;
+  --radius-ctl: 7px;
+
+  /* The wizard's content column. Declared once so the step head, the panels,
+     the stepper and the sticky footer can never fall out of alignment. */
+  --container-wizard: 1280px;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  /* Readex Pro covers Latin and Arabic, so one stack serves both directions —
+     `font-serif` is kept as the display token (headings) rather than a second
+     typeface, since the previous serif had no Arabic coverage at all. */
+  --font-sans: var(--font-readex), ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: var(--font-readex), ui-sans-serif, system-ui, 'Segoe UI',
+    sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  /* `accent-ink`, not `accent`: a focus ring has to clear 3:1 against the
+     surface behind it, which brand yellow does not on a light background. */
+  :focus-visible {
+    outline: 2px solid var(--accent-ink);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+
+  /* Numbers stay column-aligned in tables, calendars and price rows. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Latin digits inside Arabic UI keep prices and codes readable/copyable. */
+  :root[dir='rtl'] .latn {
+    font-feature-settings: normal;
+    unicode-bidi: plaintext;
+  }
+}
+
+@layer components {
+  /* The reference artifact's soft grid map backdrop. */
+  .map-grid {
+    background:
+      linear-gradient(0deg, color-mix(in srgb, var(--accent) 6%, transparent), color-mix(in srgb, var(--accent) 6%, transparent)),
+      repeating-linear-gradient(0deg, transparent 0 27px, var(--border) 27px 28px),
+      repeating-linear-gradient(90deg, transparent 0 34px, var(--border) 34px 35px),
+      var(--surface-2);
+  }
+
+  .hatch-blocked {
+    background: repeating-linear-gradient(
+      45deg,
+      var(--blocked) 0 2px,
+      transparent 2px 4px
+    );
+    box-shadow: inset 0 0 0 1px var(--blocked);
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--surface-2) 25%,
+      color-mix(in srgb, var(--border) 60%, var(--surface-2)) 37%,
+      var(--surface-2) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: 0 0;
+    }
+  }
+
+  .fade-in {
+    animation: fade-in 0.2s ease;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* RTL: mirror the chevrons and arrows that encode direction. */
+  :root[dir='rtl'] .flip-rtl {
+    transform: scaleX(-1);
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
