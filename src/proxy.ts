@@ -8,8 +8,8 @@ import { CLERK_ENABLED } from './lib/auth';
 
 const intlMiddleware = createIntlMiddleware(routing);
 
-/** Everything except the auth screens themselves is owner/admin only. */
-const isPublicRoute = createRouteMatcher(['/:locale/sign-in(.*)', '/:locale/sign-up(.*)']);
+/** Everything except the sign-in screen itself is owner/admin only. */
+const isPublicRoute = createRouteMatcher(['/:locale/sign-in(.*)']);
 
 const withClerk = clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {

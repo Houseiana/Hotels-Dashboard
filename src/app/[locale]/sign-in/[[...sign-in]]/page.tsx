@@ -31,7 +31,13 @@ export default async function SignInPage({
         <h1 className="font-serif text-[22px] font-semibold text-ink">{t('gateTitle')}</h1>
         <p className="max-w-sm text-[13px] text-muted">{t('gateBody')}</p>
       </div>
-      <SignIn />
+      {/* Clerk's default redirect is unprefixed, which would drop the visitor's
+          locale on the way back into the dashboard. Owner accounts are created
+          by an admin, so the card's self-serve sign-up link is hidden. */}
+      <SignIn
+        fallbackRedirectUrl={`/${locale}`}
+        appearance={{ elements: { footerAction: { display: 'none' } } }}
+      />
     </div>
   );
 }

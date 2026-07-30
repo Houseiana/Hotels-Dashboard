@@ -81,7 +81,6 @@
   "auth": {
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "signUp": "Create account",
     "ownerAccess": "Owner & admin access only",
     "gateTitle": "Sign in to Houseiana Hotels",
     "gateBody": "This dashboard is restricted to hotel owners and platform admins.",
