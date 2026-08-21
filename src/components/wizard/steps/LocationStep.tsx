@@ -13,9 +13,11 @@ import {
 } from 'lucide-react';
 import { Button, Card, CardBody, CardHeader, Chip } from '@/components/ui/primitives';
 import { Field, Grid2, Grid3, Select, TextInput } from '@/components/ui/form';
-import { CITY_CENTERS, COUNTRIES, COUNTRY_DEFAULT_CURRENCY } from '@/lib/catalogs';
+import { API_SUPPORTS } from '@/lib/api/capabilities';
+import { CITY_CENTERS } from '@/lib/catalogs';
 import { useCatalogLabels } from '@/lib/useLabels';
 import { useNearbyPlaces } from '@/lib/query/hooks';
+import { useCities, useLookup, useStates, useVillages } from '@/lib/query/lookups';
 import type { NearbyCategory } from '@/lib/schemas/hotel';
 import { clamp, cn } from '@/lib/utils';
 import { useWizard } from '../WizardProvider';
@@ -39,14 +41,20 @@ export function LocationStep() {
   const errors = errorsFor('location');
   const mapRef = useRef<HTMLButtonElement>(null);
 
-  const cities = draft.country ? labels.citiesOf(draft.country) : [];
+  /* The location vocabularies are a server-side chain. */
+  const countries = useLookup('countries');
+  const states = useStates(draft.stateId === undefined ? draft.countryId : draft.countryId);
+  const cities = useCities(draft.stateId);
+  const villages = useVillages(draft.cityId);
 
   const center = useMemo(() => {
     if (typeof draft.latitude === 'number' && typeof draft.longitude === 'number') {
       return { lat: draft.latitude, lng: draft.longitude };
     }
-    return CITY_CENTERS[draft.city] ?? CITY_CENTERS.doha;
-  }, [draft.latitude, draft.longitude, draft.city]);
+    // No per-city coordinates from the API, so the map opens on a sensible
+    // default until the owner drops a pin.
+    return CITY_CENTERS.cairo;
+  }, [draft.latitude, draft.longitude]);
 
   const hasPin = typeof draft.latitude === 'number' && typeof draft.longitude === 'number';
 
@@ -136,6 +144,9 @@ export function LocationStep() {
             </Field>
           </Grid2>
 
+          {/* Country → state → city → village, each list fetched from the
+              server once its parent is chosen. The names are stored alongside
+              the ids because the shared guest model carries display text. */}
           <Grid3>
             <Field
               label={t('country')}
@@ -145,27 +156,53 @@ export function LocationStep() {
             >
               <Select
                 id="country"
-                value={draft.country}
+                value={draft.countryId ?? ''}
                 onChange={(e) => {
-                  const country = e.target.value;
-                  // Changing country invalidates the city, the pin and the
-                  // currency default — reset them together rather than leaving
-                  // a Doha pin on an Egyptian address.
+                  const id = Number(e.target.value) || undefined;
+                  const item = countries.data?.find((c) => c.id === id);
+                  // Everything below the country is now meaningless, and so is
+                  // a pin that was dropped in the previous country.
                   update({
-                    country,
+                    countryId: id,
+                    country: item?.name ?? '',
+                    stateId: undefined,
+                    cityId: undefined,
                     city: '',
+                    villageId: undefined,
                     latitude: undefined,
                     longitude: undefined,
                     nearby: [],
-                    currency: COUNTRY_DEFAULT_CURRENCY[country] ?? draft.currency,
                   });
                 }}
                 invalid={Boolean(errors['country'])}
               >
                 <option value="">{tCommon('select')}</option>
-                {COUNTRIES.map((c) => (
+                {(countries.data ?? []).map((c) => (
                   <option key={c.id} value={c.id}>
-                    {labels.country(c.id)}
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field label={t('state')} htmlFor="state">
+              <Select
+                id="state"
+                value={draft.stateId ?? ''}
+                disabled={!draft.countryId || states.isPending}
+                onChange={(e) =>
+                  update({
+                    stateId: Number(e.target.value) || undefined,
+                    cityId: undefined,
+                    city: '',
+                    villageId: undefined,
+                  })
+                }
+              >
+                <option value="">{tCommon('select')}</option>
+                {(states.data ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
                   </option>
                 ))}
               </Select>
@@ -179,26 +216,48 @@ export function LocationStep() {
             >
               <Select
                 id="city"
-                value={draft.city}
-                disabled={!draft.country}
-                onChange={(e) =>
+                value={draft.cityId ?? ''}
+                disabled={!draft.stateId || cities.isPending}
+                onChange={(e) => {
+                  const id = Number(e.target.value) || undefined;
+                  const item = cities.data?.find((c) => c.id === id);
                   update({
-                    city: e.target.value,
+                    cityId: id,
+                    city: item?.name ?? '',
+                    villageId: undefined,
                     latitude: undefined,
                     longitude: undefined,
                     nearby: [],
-                  })
-                }
+                  });
+                }}
                 invalid={Boolean(errors['city'])}
               >
                 <option value="">{tCommon('select')}</option>
-                {cities.map((city) => (
-                  <option key={city} value={city}>
-                    {labels.city(city)}
+                {(cities.data ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
                   </option>
                 ))}
               </Select>
             </Field>
+
+            {/* Only offered where the city actually has villages. */}
+            {(villages.data?.length ?? 0) > 0 ? (
+              <Field label={t('village')} htmlFor="village">
+                <Select
+                  id="village"
+                  value={draft.villageId ?? ''}
+                  onChange={(e) => update({ villageId: Number(e.target.value) || undefined })}
+                >
+                  <option value="">{tCommon('select')}</option>
+                  {(villages.data ?? []).map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : null}
 
             <Field label={t('area')} htmlFor="area">
               <TextInput
@@ -253,6 +312,9 @@ export function LocationStep() {
         </CardBody>
       </Card>
 
+      {/* No nearby-place endpoint exists under the HotelManagement tag, so this
+          whole panel is hidden against the real API — see API_SUPPORTS. */}
+      {API_SUPPORTS.nearbyPlaces ? (
       <Card>
         <CardHeader
           title={t('cardNearby')}
@@ -322,6 +384,7 @@ export function LocationStep() {
           )}
         </CardBody>
       </Card>
+      ) : null}
     </>
   );
 }

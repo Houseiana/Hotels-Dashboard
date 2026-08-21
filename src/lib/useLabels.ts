@@ -35,6 +35,7 @@ export function useCatalogLabels() {
       boardBasis: (id: string) => label('boardBasis', id),
       cancellation: (id: string) => label('cancellation', id),
       bookingStatus: (id: string) => label('bookingStatus', id),
+      feeType: (id: string) => label('feeTypes', id),
       reviewCategory: (id: string) => label('reviewCategories', id),
       nearbyCategory: (id: string) => label('nearbyCategories', id),
       country: (id: string) => label('countries', id),

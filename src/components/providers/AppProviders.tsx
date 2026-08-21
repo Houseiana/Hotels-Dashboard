@@ -6,6 +6,7 @@ import { QueryProvider } from './QueryProvider';
 import { ThemeProvider } from './ThemeProvider';
 import { ToastProvider } from './ToastProvider';
 import { HotelScopeProvider } from './HotelScopeProvider';
+import { SessionProvider } from './SessionProvider';
 
 export function AppProviders({
   locale,
@@ -21,8 +22,11 @@ export function AppProviders({
       <ThemeProvider>
         <QueryProvider>
           <ToastProvider>
-            {/* Hotel scope needs the query cache, so it sits inside the client. */}
-            <HotelScopeProvider>{children}</HotelScopeProvider>
+            {/* Session owns the bearer token, so it wraps everything that fetches. */}
+            <SessionProvider>
+              {/* Hotel scope needs the query cache, so it sits inside the client. */}
+              <HotelScopeProvider>{children}</HotelScopeProvider>
+            </SessionProvider>
           </ToastProvider>
         </QueryProvider>
       </ThemeProvider>

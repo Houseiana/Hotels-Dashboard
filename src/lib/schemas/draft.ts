@@ -66,8 +66,16 @@ export const hotelDraftSchema = z.object({
   nameAr: z.string().optional(),
   description: z.string(),
   descriptionAr: z.string().optional(),
+  /* The shared model carries display names; the API needs numeric ids. Both are
+   * kept: `city`/`country` are what the guest app reads, the *Id fields are what
+   * `POST /api/hotels` is given. countryId and stateId are UI-only — they drive
+   * the location cascade but are never sent. */
   city: z.string(),
   country: z.string(),
+  countryId: z.union([z.number(), z.undefined()]).optional(),
+  stateId: z.union([z.number(), z.undefined()]).optional(),
+  cityId: z.union([z.number(), z.undefined()]).optional(),
+  villageId: z.union([z.number(), z.undefined()]).optional(),
   /** Draft-only: kept out of the shared model, folded into `address` on save. */
   area: z.string().optional(),
   buildingNo: z.string().optional(),
@@ -316,6 +324,10 @@ export function emptyDraft(id: string, currency: string = DEFAULT_CURRENCY): Hot
     descriptionAr: '',
     city: '',
     country: '',
+    countryId: undefined,
+    stateId: undefined,
+    cityId: undefined,
+    villageId: undefined,
     area: '',
     buildingNo: '',
     postalCode: '',

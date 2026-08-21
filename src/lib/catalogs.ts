@@ -6,76 +6,79 @@ import type { BoardBasis } from './schemas/hotel';
  * `catalog.*`, so both languages are always covered.
  * ------------------------------------------------------------------------- */
 
-export const HOTEL_AMENITY_GROUPS = [
+/* ---------------------------------------------------------------------------
+ * Amenities.
+ *
+ * The API exposes ONE amenity list (`/api/HotelManagementLookup/Amenities`,
+ * 39 entries) and uses it for both the hotel and its room types — so the
+ * dashboard has one list too, not the separate hotel/room lists it used to
+ * carry. The slugs below mirror the server's names one-for-one; the grouping is
+ * ours, purely to keep the chip wall readable.
+ *
+ * The server names are English-only, so the Arabic labels live in
+ * src/messages/*.json under `catalog.amenities`.
+ *
+ * KNOWN GAP: the list is short-let vocabulary (Swing, Pool Table, Ski-in) and
+ * has no hotel services at all — no restaurant, spa, room service, concierge,
+ * airport shuttle, 24h reception, laundry, meeting rooms. Those need adding to
+ * the lookup before a real hotel can describe itself properly.
+ * ------------------------------------------------------------------------- */
+
+export const AMENITY_GROUPS = [
   {
-    id: 'general',
-    items: [
-      'freeWifi',
-      'airConditioning',
-      'elevator',
-      'security24h',
-      'reception24h',
-      'nonSmokingRooms',
-      'familyRooms',
-      'accessible',
-    ],
+    id: 'essentials',
+    items: ['wifi', 'airConditioning', 'heating', 'tv', 'elevator', 'workspace', 'iron', 'hairDryer'],
   },
   {
     id: 'facilities',
     items: [
-      'swimmingPool',
+      'pool',
       'gym',
-      'spa',
-      'restaurant',
-      'bar',
-      'rooftopBar',
-      'privateBeach',
-      'garden',
-      'businessCentre',
-      'meetingRooms',
-      'kidsClub',
-      'laundry',
+      'exerciseEquipment',
+      'hotTub',
+      'jacuzzi',
+      'rooftop',
+      'privateGarden',
+      'balcony',
+      'fireplace',
+      'poolTable',
+      'piano',
+      'swing',
     ],
   },
   {
-    id: 'services',
+    id: 'kitchen',
+    items: ['kitchen', 'coffeeMaker', 'microwave', 'dishwasher', 'washer', 'dryer'],
+  },
+  {
+    id: 'outdoor',
+    items: ['bbqGrill', 'firePit', 'outdoorShower', 'beachAccess', 'lakeAccess', 'skiInSkiOut'],
+  },
+  { id: 'parking', items: ['freeParking'] },
+  {
+    id: 'safety',
     items: [
-      'freeParking',
-      'valetParking',
-      'airportShuttle',
-      'roomService',
-      'concierge',
-      'currencyExchange',
-      'carRental',
-      'petFriendly',
+      'security',
+      'securitySystem',
+      'smokeAlarm',
+      'firstAidKit',
+      'fireExtinguisher',
+      'carbonMonoxideAlarm',
     ],
   },
 ] as const;
 
-export const HOTEL_AMENITIES: string[] = HOTEL_AMENITY_GROUPS.flatMap(
-  (g) => [...g.items] as string[],
-);
+export const AMENITIES: string[] = AMENITY_GROUPS.flatMap((g) => [...g.items] as string[]);
 
-export const ROOM_AMENITIES = [
-  'airConditioning',
-  'minibar',
-  'safe',
-  'balcony',
-  'seaViewWindow',
-  'flatScreenTv',
-  'coffeeMachine',
-  'kettle',
-  'desk',
-  'wardrobe',
-  'bathtub',
-  'shower',
-  'hairdryer',
-  'bathrobes',
-  'freeToiletries',
-  'soundproof',
-  'blackoutCurtains',
-  'kitchenette',
-] as const;
+/** Kept as aliases so the wizard's two amenity pickers share one vocabulary. */
+export const HOTEL_AMENITY_GROUPS = AMENITY_GROUPS;
+export const HOTEL_AMENITIES = AMENITIES;
+export const ROOM_AMENITIES = AMENITIES;
+
+/* These three mirror the server's lookups exactly. Anything the server does not
+ * know cannot be saved — there would be no id to send — so Studio, Apartment,
+ * Courtyard, Nile/river view and Single bed were removed rather than left in
+ * the UI as choices that silently vanish on save. */
 
 export const ROOM_CATEGORIES = [
   'standard',
@@ -86,30 +89,11 @@ export const ROOM_CATEGORIES = [
   'executiveSuite',
   'presidentialSuite',
   'family',
-  'studio',
-  'apartment',
 ] as const;
 
-export const ROOM_VIEWS = [
-  'sea',
-  'river',
-  'city',
-  'garden',
-  'pool',
-  'mountain',
-  'courtyard',
-  'none',
-] as const;
+export const ROOM_VIEWS = ['sea', 'city', 'garden', 'pool', 'mountain', 'none'] as const;
 
-export const BED_TYPES = [
-  'king',
-  'queen',
-  'double',
-  'twin',
-  'single',
-  'sofa',
-  'bunk',
-] as const;
+export const BED_TYPES = ['king', 'queen', 'double', 'twin', 'sofa', 'bunk'] as const;
 
 export type BedType = (typeof BED_TYPES)[number];
 
@@ -220,11 +204,20 @@ export const BOOKING_STATUSES = [
   'cancelled',
 ] as const;
 
+/**
+ * Display order for the rating breakdown. The first six are the API's own
+ * sub-scores; the remainder are the older categories the mock data uses. The
+ * breakdown card renders only the entries a hotel actually has a score for.
+ */
 export const REVIEW_CATEGORIES = [
-  'staff',
   'cleanliness',
-  'comfort',
+  'accuracy',
+  'checkIn',
+  'communication',
   'location',
+  'value',
+  'staff',
+  'comfort',
   'facilities',
   'valueForMoney',
   'freeWifi',

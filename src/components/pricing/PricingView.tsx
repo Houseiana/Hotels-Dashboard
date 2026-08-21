@@ -8,14 +8,24 @@ import { Button, Card, Chip, EmptyState, PageHeader, Skeleton } from '@/componen
 import { Select } from '@/components/ui/form';
 import { Link } from '@/i18n/navigation';
 import { useHotelScope } from '@/components/providers/HotelScopeProvider';
-import { useAvailability } from '@/lib/query/hooks';
+import { useAvailability, useHotelList, usePricingRoomTypes } from '@/lib/query/hooks';
+import { CALENDAR_YEAR } from '@/lib/api/pricing';
+import { USE_MOCK } from '@/lib/api/config';
 import { useCatalogLabels } from '@/lib/useLabels';
 import type { DayInventory } from '@/lib/schemas/booking';
 import { cn, daysInMonth, formatDate, formatMoney, toISODate } from '@/lib/utils';
 import { DayEditor } from './DayEditor';
 import { BulkEditor } from './BulkEditor';
+import { PricingEditor } from './PricingEditor';
+import { DayTooltip, type CellAnchor } from './DayTooltip';
 
 type CellState = 'open' | 'low' | 'sold';
+
+/** Viewport position of a calendar cell, for the portalled day panel. */
+function anchorOf(element: HTMLElement): CellAnchor {
+  const rect = element.getBoundingClientRect();
+  return { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width };
+}
 
 function stateOf(available: number): CellState {
   if (available <= 0) return 'sold';
@@ -37,32 +47,56 @@ export function PricingView() {
   const labels = useCatalogLabels();
   const params = useSearchParams();
 
-  const { hotelId: scopedHotelId, hotels, isPending: hotelsPending, setHotelId } = useHotelScope();
+  const { hotelId: scopedHotelId, setHotelId } = useHotelScope();
+  const hotels = useHotelList({ page: 1, limit: 100 });
+  const summaries = hotels.data?.items ?? [];
   const requestedHotel = params.get('hotel');
 
   useEffect(() => {
     if (requestedHotel && requestedHotel !== scopedHotelId) setHotelId(requestedHotel);
   }, [requestedHotel, scopedHotelId, setHotelId]);
 
-  const hotelId = scopedHotelId ?? hotels[0]?.id;
-  const hotel = hotels.find((h) => h.id === hotelId);
+  const hotelId = scopedHotelId ?? summaries[0]?.id;
+  const summary = summaries.find((h) => h.id === hotelId);
+
+  // Room types and their rate plans come from the hotel record, not the summary
+  // list — the list carries neither.
+  const { roomTypes, currency: mockCurrency, isPending: roomTypesPending } =
+    usePricingRoomTypes(hotelId);
 
   // Derived rather than synced: a room type belonging to a previously selected
   // hotel simply stops matching and the first room type takes over.
   const [roomTypeId, setRoomTypeId] = useState<string | undefined>();
-  const roomType =
-    hotel?.roomTypes.find((rt) => rt.id === roomTypeId) ?? hotel?.roomTypes[0];
+  const roomType = roomTypes.find((rt) => rt.id === roomTypeId) ?? roomTypes[0];
   const activeRoomTypeId = roomType?.id;
+
+  // Prices hang off a rate plan, so the calendar always shows one plan's rates.
+  const [ratePlanId, setRatePlanId] = useState<string | undefined>();
+  const ratePlan =
+    roomType?.ratePlans.find((plan) => plan.id === ratePlanId) ?? roomType?.ratePlans[0];
 
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() };
+    return { year: USE_MOCK ? now.getFullYear() : CALENDAR_YEAR, month: now.getMonth() };
   });
 
   const [editing, setEditing] = useState<DayInventory | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  // The day panel is portalled out of the scrolling grid, so it needs the
+  // hovered cell's position rather than CSS `group-hover`.
+  const [hovered, setHovered] = useState<{ day: DayInventory; anchor: CellAnchor } | null>(null);
 
-  const calendar = useAvailability(hotelId, activeRoomTypeId, cursor.year, cursor.month);
+  const fallbackCurrency = mockCurrency ?? summary?.currencyCode ?? undefined;
+  const calendar = useAvailability(
+    hotelId,
+    activeRoomTypeId,
+    cursor.year,
+    cursor.month,
+    ratePlan?.id,
+    fallbackCurrency ?? undefined,
+  );
+  const currency = calendar.data?.currency ?? fallbackCurrency ?? 'EGP';
+  const hotelsPending = hotels.isPending || roomTypesPending;
 
   const weekdayLabels = useMemo(() => {
     const formatter = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG' : 'en-GB', {
@@ -81,11 +115,18 @@ export function PricingView() {
     [locale, cursor],
   );
 
+  // The calendar endpoint takes a month but no year, so it can only answer for
+  // the current one. Rather than page into a month that silently returns the
+  // wrong year's data, navigation stops at the year's edges.
   const shiftMonth = (delta: number) =>
     setCursor(({ year, month }) => {
       const next = new Date(year, month + delta, 1);
+      if (!USE_MOCK && next.getFullYear() !== CALENDAR_YEAR) return { year, month };
       return { year: next.getFullYear(), month: next.getMonth() };
     });
+
+  const atYearEdge = (delta: number) =>
+    !USE_MOCK && new Date(cursor.year, cursor.month + delta, 1).getFullYear() !== CALENDAR_YEAR;
 
   const stats = useMemo(() => {
     if (!calendar.data) return null;
@@ -116,7 +157,7 @@ export function PricingView() {
     );
   }
 
-  if (!hotel) {
+  if (!summary) {
     return (
       <div className="flex flex-col gap-5">
         <PageHeader title={t('title')} subtitle={t('subtitle')} />
@@ -142,7 +183,7 @@ export function PricingView() {
           icon={<BedDouble className="size-5" />}
           title={t('noRoomTypes')}
           action={
-            <Link href={`/hotels/${hotel.id}/edit?step=rooms`}>
+            <Link href={`/hotels/${hotelId}/edit?step=rooms`}>
               <Button variant="primary">{t('noRoomTypesAction')}</Button>
             </Link>
           }
@@ -184,9 +225,9 @@ export function PricingView() {
                   className="text-[16px] font-semibold"
                   aria-label={t('selectRoomType')}
                 >
-                  {hotel.roomTypes.map((rt) => (
+                  {roomTypes.map((rt) => (
                     <option key={rt.id} value={rt.id}>
-                      {rt.name} · {labels.category(rt.category)}
+                      {rt.name} · {labels.category(rt.categoryLabel)}
                     </option>
                   ))}
                 </Select>
@@ -194,6 +235,29 @@ export function PricingView() {
               <Chip tone="accent">{t('unitsTotal', { count: roomType.inventory })}</Chip>
             </div>
           </div>
+
+          {/* Nightly prices belong to a rate plan, so the calendar shows one. */}
+          {roomType.ratePlans.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[.08em] text-faint">
+                {t('ratePlan')}
+              </span>
+              <div className="w-[200px]">
+                <Select
+                  value={ratePlan?.id}
+                  onChange={(e) => setRatePlanId(e.target.value)}
+                  aria-label={t('selectRatePlan')}
+                  className="text-[13.5px] font-semibold"
+                >
+                  {roomType.ratePlans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {labels.boardBasis(plan.label) || plan.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-1.5 sm:ms-auto">
             <span className="text-[10.5px] font-semibold uppercase tracking-[.08em] text-faint">
@@ -204,7 +268,8 @@ export function PricingView() {
                 type="button"
                 onClick={() => shiftMonth(-1)}
                 aria-label={t('prevMonth')}
-                className="grid w-8 place-items-center rounded-s-[9px] border border-line bg-surface-2 text-muted transition hover:border-line-strong hover:text-ink"
+                disabled={atYearEdge(-1)}
+                className="grid w-8 place-items-center rounded-s-[9px] border border-line bg-surface-2 text-muted transition hover:border-line-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="flip-rtl size-4" />
               </button>
@@ -215,7 +280,8 @@ export function PricingView() {
                 type="button"
                 onClick={() => shiftMonth(1)}
                 aria-label={t('nextMonth')}
-                className="grid w-8 place-items-center rounded-e-[9px] border border-line bg-surface-2 text-muted transition hover:border-line-strong hover:text-ink"
+                disabled={atYearEdge(1)}
+                className="grid w-8 place-items-center rounded-e-[9px] border border-line bg-surface-2 text-muted transition hover:border-line-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight className="flip-rtl size-4" />
               </button>
@@ -246,7 +312,7 @@ export function PricingView() {
               },
               {
                 k: t('statAvgRate'),
-                n: formatMoney(stats.avgRate, calendar.data?.currency ?? hotel.currency, locale, {
+                n: formatMoney(stats.avgRate, currency, locale, {
                   compact: true,
                 }),
                 s: '',
@@ -329,6 +395,10 @@ export function PricingView() {
                       key={day.date}
                       type="button"
                       onClick={() => setEditing(day)}
+                      onMouseEnter={(e) => setHovered({ day, anchor: anchorOf(e.currentTarget) })}
+                      onMouseLeave={() => setHovered(null)}
+                      onFocus={(e) => setHovered({ day, anchor: anchorOf(e.currentTarget) })}
+                      onBlur={() => setHovered(null)}
                       className={cn(
                         'group relative flex min-h-[86px] flex-col rounded-[11px] border px-[9px] pb-[9px] pt-2 text-start transition-[transform,box-shadow,border-color] hover:z-[5] hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]',
                         styles.cell,
@@ -368,40 +438,18 @@ export function PricingView() {
                       </span>
 
                       <span className="mt-1 flex items-center gap-1.5 text-[10.5px] font-medium text-faint latn">
-                        {formatMoney(day.price, calendar.data.currency, locale, { compact: true })}
+                        {formatMoney(day.price, currency, locale, { compact: true })}
                         {discounted ? (
                           <span className="rounded-[3px] bg-accent/15 px-1 font-bold text-accent-ink">
                             {t('savingsBadge', { percent: day.discountPercent ?? 0 })}
                           </span>
+                        ) : day.isSpecialPrice ? (
+                          <span className="rounded-[3px] bg-accent/15 px-1 font-bold text-accent-ink">
+                            {t('specialPrice')}
+                          </span>
                         ) : null}
                       </span>
 
-                      {/* hover detail, mirroring the reference tooltip */}
-                      <span className="pointer-events-none absolute bottom-[calc(100%+8px)] start-1/2 z-20 w-[184px] -translate-x-1/2 translate-y-1 rounded-[9px] bg-ink px-2.5 py-2.5 text-[11.5px] text-surface opacity-0 shadow-[var(--shadow-pop)] transition group-hover:translate-y-0 group-hover:opacity-100">
-                        <span className="mb-1.5 block text-[12px] font-bold">
-                          {formatDate(day.date, locale)}
-                        </span>
-                        {[
-                          [t('capacity'), total],
-                          [t('soldPlatform'), day.sold],
-                          [t('blockedManual'), day.blocked],
-                        ].map(([label, value]) => (
-                          <span key={String(label)} className="flex justify-between gap-3 py-px opacity-80">
-                            <span>{label}</span>
-                            <b className="latn">{value}</b>
-                          </span>
-                        ))}
-                        <span className="mt-1 flex justify-between gap-3 border-t border-surface/30 pt-1.5">
-                          <span>{t('available')}</span>
-                          <b className="latn">{available}</b>
-                        </span>
-                        <span className="flex justify-between gap-3 py-px opacity-80">
-                          <span>{t('rate')}</span>
-                          <b className="latn">
-                            {formatMoney(day.price, calendar.data.currency, locale)}
-                          </b>
-                        </span>
-                      </span>
                     </button>
                   );
                 })}
@@ -413,34 +461,69 @@ export function PricingView() {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line bg-surface-2 px-5 py-3.5">
           <code className="rounded-[7px] border border-line bg-surface px-2.5 py-1 font-mono text-[12px] text-ink latn">
             <span className="font-bold text-open">GET</span> /api/room-types/
-            {activeRoomTypeId}/availability?from={toISODate(monthStart)}&amp;to=
-            {toISODate(monthEnd)}
+            {activeRoomTypeId}/calendar?month={cursor.month + 1}
+            {ratePlan ? `&ratePlanId=${ratePlan.id}` : ''}
           </code>
           <span className="text-[12px] text-muted">{t('formula')}</span>
         </div>
       </Card>
 
-      {editing ? (
-        <DayEditor
-          key={editing.date}
-          hotelId={hotel.id}
-          roomTypeId={roomType.id}
-          currency={calendar.data?.currency ?? hotel.currency}
-          totalUnits={calendar.data?.totalUnits ?? roomType.inventory}
-          day={editing}
-          onClose={() => setEditing(null)}
+      {hovered && calendar.data ? (
+        <DayTooltip
+          day={hovered.day}
+          total={calendar.data.totalUnits}
+          currency={currency}
+          anchor={hovered.anchor}
         />
       ) : null}
 
-      <BulkEditor
-        open={bulkOpen}
-        onClose={() => setBulkOpen(false)}
-        hotelId={hotel.id}
-        roomTypeId={roomType.id}
-        monthStart={monthStart}
-        monthEnd={monthEnd}
-        weekdayLabels={weekdayLabels}
-      />
+      {/* Mock mode keeps the richer editors (discounts, stop-sell, minimum
+          stay) because its store has fields for them. Against the real API
+          those fields have nowhere to go, so it gets the range editor that
+          maps onto the endpoints that exist. */}
+      {USE_MOCK ? (
+        <>
+          {editing ? (
+            <DayEditor
+              key={editing.date}
+              hotelId={hotelId as string}
+              roomTypeId={roomType.id}
+              currency={currency}
+              totalUnits={calendar.data?.totalUnits ?? roomType.inventory}
+              day={editing}
+              onClose={() => setEditing(null)}
+            />
+          ) : null}
+
+          <BulkEditor
+            open={bulkOpen}
+            onClose={() => setBulkOpen(false)}
+            hotelId={hotelId as string}
+            roomTypeId={roomType.id}
+            monthStart={monthStart}
+            monthEnd={monthEnd}
+            weekdayLabels={weekdayLabels}
+          />
+        </>
+      ) : (
+        <PricingEditor
+          key={editing?.date ?? 'range'}
+          open={bulkOpen || editing !== null}
+          onClose={() => {
+            setBulkOpen(false);
+            setEditing(null);
+          }}
+          roomTypeId={roomType.id}
+          ratePlanId={ratePlan?.id}
+          ratePlanLabel={ratePlan ? labels.boardBasis(ratePlan.label) || ratePlan.label : ''}
+          currency={currency}
+          totalUnits={calendar.data?.totalUnits ?? roomType.inventory}
+          initialFrom={editing?.date ?? toISODate(monthStart)}
+          initialTo={editing?.date ?? toISODate(monthEnd)}
+          minDate={toISODate(new Date(CALENDAR_YEAR, 0, 1))}
+          maxDate={toISODate(new Date(CALENDAR_YEAR, 11, 31))}
+        />
+      )}
 
       <p className="text-[11.5px] text-faint">
         {tCommon('from')} {formatDate(toISODate(monthStart), locale)} — {tCommon('to')}{' '}

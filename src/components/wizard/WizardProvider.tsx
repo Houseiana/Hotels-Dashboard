@@ -13,7 +13,6 @@ import {
 import {
   draftToHotel,
   emptyDraft,
-  hotelToDraft,
   STEP_SCHEMAS,
   WIZARD_STEPS,
   type HotelDraft,
@@ -23,7 +22,15 @@ import {
 } from '@/lib/schemas/draft';
 import { hotelSchema, type Hotel } from '@/lib/schemas/hotel';
 import { collectIssues, issueMap, validate, type FieldIssue } from '@/lib/schemas/errors';
-import { useSaveHotel } from '@/lib/query/hooks';
+import { useCreateHotel } from '@/lib/query/hooks';
+import { useLookup, useCurrencyLookup } from '@/lib/query/lookups';
+import { applyHotelEdit, type EditResult } from '@/lib/api/hotelUpdate';
+import type { HotelDetail } from '@/lib/schemas/hotelApi';
+import { queryKeys } from '@/lib/query/keys';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSession } from '@/components/providers/SessionProvider';
+import { draftToCreateForm } from '@/lib/api/hotelSubmit';
+import { clearDraft, loadDraft, saveDraft, NEW_DRAFT_KEY } from '@/lib/wizard/draftStore';
 import { makeId } from '@/lib/utils';
 import { BOARD_INCLUDES_BREAKFAST, DEFAULT_CURRENCY } from '@/lib/catalogs';
 
@@ -57,14 +64,21 @@ type WizardContextValue = {
   removeRatePlan: (roomIndex: number, planIndex: number) => void;
 
   toHotel: () => Hotel;
-  saveNow: (status?: Hotel['status']) => Promise<Hotel>;
+  /** Flush the draft to local storage immediately. */
+  saveDraftNow: () => void;
+  /** Create the hotel on the API; resolves to its new id, or null if unknown. */
+  submit: () => Promise<string | null>;
+  /**
+   * Saves an existing hotel by diffing it against what was loaded. Null when
+   * this wizard is creating rather than editing.
+   */
+  saveEdit: (() => Promise<EditResult>) | null;
   isSaving: boolean;
 };
 
 const WizardContext = createContext<WizardContextValue | null>(null);
 
-const NEW_DRAFT_KEY = 'houseiana.wizard.newDraftId';
-const AUTOSAVE_DELAY = 1200;
+const AUTOSAVE_DELAY = 800;
 
 function newRoom(): RoomTypeDraft {
   return {
@@ -99,30 +113,62 @@ function newRatePlan(): RatePlanDraft {
 }
 
 export function WizardProvider({
-  hotel,
+  initialDraft,
+  initialDetail,
   defaultCurrency,
   initialStep,
   children,
 }: {
-  /** Undefined for /hotels/new. */
-  hotel?: Hotel;
+  /** An existing hotel loaded from the API; undefined for /hotels/new. */
+  initialDraft?: HotelDraft;
+  /** The same hotel in the API's own shape — saving diffs against it. */
+  initialDetail?: HotelDetail;
   defaultCurrency?: string;
   initialStep?: WizardStep;
   children: ReactNode;
 }) {
-  const saveHotel = useSaveHotel();
+  const createHotel = useCreateHotel();
+  const { managerId } = useSession();
+  const queryClient = useQueryClient();
+
+  /* Every server vocabulary the submit mapper needs to turn slugs into ids. */
+  const amenities = useLookup('amenities');
+  const roomCategory = useLookup('roomCategory');
+  const viewType = useLookup('viewType');
+  const bedType = useLookup('bedType');
+  const boardBasis = useLookup('boardBasis');
+  const cancellationPolicyType = useLookup('cancellationPolicyType');
+  const currencies = useCurrencyLookup();
+
+  const lookups = useMemo(
+    () => ({
+      amenities: amenities.data,
+      roomCategory: roomCategory.data,
+      viewType: viewType.data,
+      bedType: bedType.data,
+      boardBasis: boardBasis.data,
+      cancellationPolicyType: cancellationPolicyType.data,
+      currencies: currencies.data,
+    }),
+    [
+      amenities.data,
+      roomCategory.data,
+      viewType.data,
+      bedType.data,
+      boardBasis.data,
+      cancellationPolicyType.data,
+      currencies.data,
+    ],
+  );
+
+  /** Which local-storage slot this wizard owns. */
+  const draftKey = initialDraft?.id ?? NEW_DRAFT_KEY;
 
   const [draft, setDraft] = useState<HotelDraft>(() => {
-    if (hotel) return hotelToDraft(hotel);
-    // Resuming /hotels/new after a reload must land on the same draft record,
-    // not orphan the previous one.
-    const stored =
-      typeof window !== 'undefined' ? window.sessionStorage.getItem(NEW_DRAFT_KEY) : null;
-    const id = stored ?? makeId('htl');
-    if (typeof window !== 'undefined' && !stored) {
-      window.sessionStorage.setItem(NEW_DRAFT_KEY, id);
-    }
-    return emptyDraft(id, defaultCurrency ?? DEFAULT_CURRENCY);
+    // A draft in progress wins over the server copy — it is strictly newer.
+    const stored = loadDraft(draftKey);
+    if (stored) return stored;
+    return initialDraft ?? emptyDraft(makeId('htl'), defaultCurrency ?? DEFAULT_CURRENCY);
   });
 
   const [step, setStep] = useState<WizardStep>(initialStep ?? 'basics');
@@ -134,7 +180,7 @@ export function WizardProvider({
   // just now" for a hotel loaded from the server would be a lie.
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  const isNew = !hotel;
+  const isNew = !initialDraft;
   const stepIndex = WIZARD_STEPS.indexOf(step);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -145,31 +191,21 @@ export function WizardProvider({
     latest.current = draft;
   }, [draft]);
 
-  const persist = useCallback(
-    async (value: HotelDraft, status?: Hotel['status']) => {
-      const payload = { ...draftToHotel(value), status: status ?? value.status };
-      setSaveState('saving');
-      const saved = await saveHotel.mutateAsync(payload);
-      setSaveState('saved');
-      setSavedAt(Date.now());
-      return saved;
-    },
-    [saveHotel],
-  );
-
-  /* Debounced draft autosave. A nameless draft is not worth a record yet, so
-   * nothing is written until the hotel has at least a name. */
+  /* Debounced autosave to LOCAL STORAGE. The API takes a whole hotel in one
+   * request and has no draft endpoint, so a half-filled wizard has nowhere on
+   * the server to live — see src/lib/wizard/draftStore.ts. */
   useEffect(() => {
     if (saveState !== 'dirty') return;
-    if (!draft.name.trim()) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      void persist(latest.current).catch(() => setSaveState('dirty'));
+      const ok = saveDraft(draftKey, latest.current);
+      setSaveState(ok ? 'saved' : 'dirty');
+      if (ok) setSavedAt(Date.now());
     }, AUTOSAVE_DELAY);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [draft, saveState, persist]);
+  }, [draft, saveState, draftKey]);
 
   const update = useCallback((patch: Partial<HotelDraft>) => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -289,18 +325,67 @@ export function WizardProvider({
 
   const toHotel = useCallback(() => draftToHotel(latest.current), []);
 
-  const saveNow = useCallback(
-    async (status?: Hotel['status']) => {
-      if (timer.current) clearTimeout(timer.current);
-      const saved = await persist(latest.current, status);
-      if (status) setDraft((current) => ({ ...current, status }));
-      if (isNew && typeof window !== 'undefined') {
-        window.sessionStorage.removeItem(NEW_DRAFT_KEY);
-      }
-      return saved;
-    },
-    [persist, isNew],
-  );
+  /** Flushes the pending debounce so nothing is lost on navigate. */
+  const saveDraftNow = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    const ok = saveDraft(draftKey, latest.current);
+    setSaveState(ok ? 'saved' : 'dirty');
+    if (ok) setSavedAt(Date.now());
+  }, [draftKey]);
+
+  /**
+   * Sends the whole hotel to `POST /api/hotels` in one multipart request and
+   * returns its new id, or null when the API accepted it but the follow-up
+   * lookup could not identify which row it made.
+   */
+  const submit = useCallback(async (): Promise<string | null> => {
+    if (timer.current) clearTimeout(timer.current);
+    const form = await draftToCreateForm(latest.current, managerId, lookups);
+    const id = await createHotel.mutateAsync({
+      form,
+      managerId,
+      name: latest.current.name,
+    });
+    // Only drop the local draft once the server has definitely taken it.
+    clearDraft(draftKey);
+    return id;
+  }, [createHotel, draftKey, managerId, lookups]);
+
+  /**
+   * Every vocabulary the diff resolves slugs through. Saving before these load
+   * would resolve each one to `undefined` and send an edit that strips the
+   * hotel's category, view and amenities — so saving waits for them.
+   */
+  const lookupsReady =
+    Boolean(lookups.amenities?.length) &&
+    Boolean(lookups.roomCategory?.length) &&
+    Boolean(lookups.viewType?.length) &&
+    Boolean(lookups.bedType?.length) &&
+    Boolean(lookups.boardBasis?.length) &&
+    Boolean(lookups.cancellationPolicyType?.length);
+
+  const [isEditing, setIsEditing] = useState(false);
+
+  const saveEdit = useCallback(async (): Promise<EditResult> => {
+    if (!initialDetail) throw new Error('saveEdit called on a wizard that is creating');
+    if (timer.current) clearTimeout(timer.current);
+    setIsEditing(true);
+    try {
+      const result = await applyHotelEdit(
+        initialDetail,
+        latest.current,
+        lookups,
+        defaultCurrency ?? DEFAULT_CURRENCY,
+      );
+      // A partial failure leaves the local draft in place: it is the only copy
+      // of the changes that did not reach the server.
+      if (result.ok) clearDraft(draftKey);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.hotels.all });
+      return result;
+    } finally {
+      setIsEditing(false);
+    }
+  }, [initialDetail, lookups, defaultCurrency, draftKey, queryClient]);
 
   const value = useMemo<WizardContextValue>(
     () => ({
@@ -326,8 +411,10 @@ export function WizardProvider({
       updateRatePlan,
       removeRatePlan,
       toHotel,
-      saveNow,
-      isSaving: saveHotel.isPending,
+      saveDraftNow,
+      submit,
+      saveEdit: initialDetail && lookupsReady ? saveEdit : null,
+      isSaving: createHotel.isPending || isEditing,
     }),
     [
       draft,
@@ -351,8 +438,13 @@ export function WizardProvider({
       updateRatePlan,
       removeRatePlan,
       toHotel,
-      saveNow,
-      saveHotel.isPending,
+      saveDraftNow,
+      submit,
+      saveEdit,
+      initialDetail,
+      lookupsReady,
+      isEditing,
+      createHotel.isPending,
     ],
   );
 

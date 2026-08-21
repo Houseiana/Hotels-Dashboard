@@ -1,9 +1,10 @@
 /**
- * Clerk gates the whole dashboard, but the project must also be runnable by a
- * reviewer who has no Clerk tenant. When no publishable key is present we fall
- * back to a clearly-labelled dev session instead of crashing at boot.
+ * The dashboard owns its own sign-in: email + password against
+ * `POST /api/hotels/login`, with the returned bearer token held in a cookie
+ * (see src/lib/auth/session.ts).
+ *
+ * While the mock backend is in use there is no real credential to check, so the
+ * login form accepts anything and mints a demo session — this keeps the project
+ * runnable without a backend, exactly as USE_MOCK does for the data layer.
  */
-export const CLERK_PUBLISHABLE_KEY =
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
-
-export const CLERK_ENABLED = CLERK_PUBLISHABLE_KEY.length > 0;
+export { USE_MOCK as AUTH_IS_MOCKED } from './api/config';

@@ -16,7 +16,6 @@ import { PhotosStep } from './steps/PhotosStep';
 import { RoomsStep } from './steps/RoomsStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { usePublish } from './usePublish';
-import { useToast } from '@/components/providers/ToastProvider';
 
 function SaveIndicator() {
   const t = useTranslations('wizard');
@@ -68,20 +67,16 @@ export function HotelWizard() {
   const tCommon = useTranslations('common');
   const tHotels = useTranslations('hotels');
   const tReview = useTranslations('wizard.review');
-  const { draft, step, stepIndex, next, back, saveNow, isSaving, savedAt } = useWizard();
+  const { draft, isNew, step, stepIndex, next, back, saveDraftNow, isSaving, savedAt } =
+    useWizard();
   const { publish, busy, canPublish } = usePublish();
   const router = useRouter();
-  const toast = useToast();
 
   const isLast = stepIndex === WIZARD_STEPS.length - 1;
 
-  const saveDraftAndExit = async () => {
-    try {
-      if (draft.name.trim()) await saveNow('draft');
-      router.push('/hotels');
-    } catch {
-      toast(tCommon('somethingWentWrong'), 'error');
-    }
+  const saveDraftAndExit = () => {
+    saveDraftNow();
+    router.push('/hotels');
   };
 
   return (
@@ -95,9 +90,7 @@ export function HotelWizard() {
         <span className="flex items-center gap-1.5 text-[12.5px] text-faint">
           <span className="hidden sm:inline">{t('crumbHotels')}</span>
           <ChevronRight className="flip-rtl hidden size-3 sm:block" />
-          <b className="font-medium text-muted">
-            {draft.status === 'draft' && !draft.name ? t('crumbAdd') : t('crumbEdit')}
-          </b>
+          <b className="font-medium text-muted">{isNew ? t('crumbAdd') : t('crumbEdit')}</b>
         </span>
         <span className="ms-auto flex items-center gap-3">
           <SaveIndicator key={savedAt ?? 'unsaved'} />
@@ -109,7 +102,7 @@ export function HotelWizard() {
         <div className="mx-auto flex max-w-wizard items-center gap-3 pb-4">
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className="text-[11.5px] font-semibold uppercase tracking-[.08em] text-faint">
-              {draft.status === 'active' ? t('editHotel') : t('newHotel')}
+              {isNew ? t('newHotel') : t('editHotel')}
             </span>
             <h1 className="truncate font-serif text-[22px] font-semibold tracking-[-.01em] text-ink">
               {draft.name || t('untitled')}
@@ -159,7 +152,11 @@ export function HotelWizard() {
               ) : (
                 <Send className="size-4" />
               )}
-              {draft.status === 'active' ? tReview('republish') : tReview('publish')}
+              {!isNew
+                ? tReview('saveChanges')
+                : draft.status === 'active'
+                  ? tReview('republish')
+                  : tReview('publish')}
             </Button>
           ) : (
             <Button variant="primary" onClick={next}>

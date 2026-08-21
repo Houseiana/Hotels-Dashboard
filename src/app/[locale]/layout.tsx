@@ -3,12 +3,10 @@ import { Readex_Pro } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import { hasLocale } from 'next-intl';
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
-import { ClerkProvider } from '@clerk/nextjs';
 import type { ReactNode } from 'react';
 import { dirOf, routing } from '@/i18n/routing';
 import { AppProviders } from '@/components/providers/AppProviders';
 import { themeScript } from '@/components/providers/ThemeProvider';
-import { CLERK_ENABLED } from '@/lib/auth';
 import '../globals.css';
 
 /**
@@ -60,7 +58,7 @@ export default async function LocaleLayout({
 
   const messages = await getMessages();
 
-  const tree = (
+  return (
     <html
       lang={locale}
       dir={dirOf(locale)}
@@ -78,7 +76,4 @@ export default async function LocaleLayout({
       </body>
     </html>
   );
-
-  // Without Clerk keys the app still boots — see src/lib/auth.ts.
-  return CLERK_ENABLED ? <ClerkProvider>{tree}</ClerkProvider> : tree;
 }

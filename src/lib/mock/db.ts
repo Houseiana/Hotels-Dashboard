@@ -265,6 +265,8 @@ export async function getAvailability(
     roomTypeId,
     totalUnits: roomType.inventory,
     currency: hotel.currency,
+    // The mock prices the room type directly, so there is no plan to pick.
+    ratePlans: [],
     days: structuredClone(days),
   };
 }

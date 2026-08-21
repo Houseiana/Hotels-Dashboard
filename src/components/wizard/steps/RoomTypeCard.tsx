@@ -15,13 +15,10 @@ import {
   TextArea,
   TextInput,
 } from '@/components/ui/form';
-import {
-  BED_TYPES,
-  DEFAULT_CURRENCY,
-  ROOM_AMENITIES,
-  ROOM_CATEGORIES,
-  ROOM_VIEWS,
-} from '@/lib/catalogs';
+import { DEFAULT_CURRENCY } from '@/lib/catalogs';
+import { AMENITY_NAMES, BED_NAMES, CATEGORY_NAMES, VIEW_NAMES } from '@/lib/api/catalogMap';
+import { labelFor, useLookupOptions } from '@/lib/query/lookupOptions';
+import { API_SUPPORTS } from '@/lib/api/capabilities';
 import { useCatalogLabels } from '@/lib/useLabels';
 import type { RoomTypeDraft } from '@/lib/schemas/draft';
 import {
@@ -55,6 +52,11 @@ export function RoomTypeCard({
   const labels = useCatalogLabels();
   const locale = useLocale();
   const { draft, updateRoom, errorsFor } = useWizard();
+  /* Every vocabulary comes from the server: it decides what can be saved. */
+  const categories = useLookupOptions('roomCategory', CATEGORY_NAMES, labels.category);
+  const views = useLookupOptions('viewType', VIEW_NAMES, labels.view);
+  const beds = useLookupOptions('bedType', BED_NAMES, labels.bedType);
+  const amenityOptions = useLookupOptions('amenities', AMENITY_NAMES, labels.roomAmenity);
   const errors = errorsFor('rooms');
   const key = (field: string) => errors[`roomTypes[${index}].${field}`];
 
@@ -192,10 +194,18 @@ export function RoomTypeCard({
                 onChange={(e) => updateRoom(index, { category: e.target.value })}
                 invalid={Boolean(key('category'))}
                 aria-label={t('category')}
+                disabled={categories.isPending}
               >
-                {ROOM_CATEGORIES.map((id) => (
-                  <option key={id} value={id}>
-                    {labels.category(id)}
+                {/* An existing value the server no longer offers still needs to
+                    render, or editing a hotel would silently blank the field. */}
+                {room.category && !categories.options.some((o) => o.value === room.category) ? (
+                  <option value={room.category}>
+                    {labelFor(room.category, categories.options, labels.category)}
+                  </option>
+                ) : null}
+                {categories.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </Select>
@@ -206,10 +216,16 @@ export function RoomTypeCard({
                 value={room.view ?? ''}
                 onChange={(e) => updateRoom(index, { view: e.target.value })}
                 aria-label={t('view')}
+                disabled={views.isPending}
               >
-                {ROOM_VIEWS.map((id) => (
-                  <option key={id} value={id}>
-                    {labels.view(id)}
+                {room.view && !views.options.some((o) => o.value === room.view) ? (
+                  <option value={room.view}>
+                    {labelFor(room.view, views.options, labels.view)}
+                  </option>
+                ) : null}
+                {views.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </Select>
@@ -240,16 +256,19 @@ export function RoomTypeCard({
               />
             </Field>
 
-            {/* Not present in the reference artifact — added for the shared model. */}
-            <Field label={t('bathrooms')} required error={labels.validation(key('bathrooms'))}>
-              <NumberInput
-                value={room.bathrooms}
-                onValueChange={(v) => updateRoom(index, { bathrooms: v })}
-                min={0}
-                aria-label={t('bathrooms')}
-                invalid={Boolean(key('bathrooms'))}
-              />
-            </Field>
+            {/* Added for the shared model; hidden while the API has nowhere to
+                store it — see API_SUPPORTS in src/lib/api/capabilities.ts. */}
+            {API_SUPPORTS.roomBathrooms ? (
+              <Field label={t('bathrooms')} required error={labels.validation(key('bathrooms'))}>
+                <NumberInput
+                  value={room.bathrooms}
+                  onValueChange={(v) => updateRoom(index, { bathrooms: v })}
+                  min={0}
+                  aria-label={t('bathrooms')}
+                  invalid={Boolean(key('bathrooms'))}
+                />
+              </Field>
+            ) : null}
 
             <Field
               label={t('inventory')}
@@ -305,10 +324,16 @@ export function RoomTypeCard({
                     }
                     aria-label={t('bedType')}
                     className="max-w-[200px]"
+                    disabled={beds.isPending}
                   >
-                    {BED_TYPES.map((id) => (
-                      <option key={id} value={id}>
-                        {labels.bedType(id)}
+                    {bed.type && !beds.options.some((o) => o.value === bed.type) ? (
+                      <option value={bed.type}>
+                        {labelFor(bed.type, beds.options, labels.bedType)}
+                      </option>
+                    ) : null}
+                    {beds.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </Select>
@@ -337,7 +362,10 @@ export function RoomTypeCard({
                 size="sm"
                 variant="ghost"
                 className="self-start text-accent-ink"
-                onClick={() => commitBeds([...bedRows, { type: 'twin', qty: 1 }])}
+                disabled={beds.options.length === 0}
+                onClick={() =>
+                  commitBeds([...bedRows, { type: beds.options[0]?.value ?? '', qty: 1 }])
+                }
               >
                 <Plus className="size-3.5" />
                 {t('addBed')}
@@ -353,13 +381,13 @@ export function RoomTypeCard({
           <div className="flex flex-col gap-2">
             <SubHeading hint={`· ${t('roomAmenitiesScope')}`}>{t('roomAmenities')}</SubHeading>
             <div className="flex flex-wrap gap-2">
-              {ROOM_AMENITIES.map((id) => (
+              {amenityOptions.options.map((option) => (
                 <SelectChip
-                  key={id}
-                  selected={roomAmenities.has(id)}
-                  onToggle={() => toggleAmenity(id)}
+                  key={option.value}
+                  selected={roomAmenities.has(option.value)}
+                  onToggle={() => toggleAmenity(option.value)}
                 >
-                  {labels.roomAmenity(id)}
+                  {option.label}
                 </SelectChip>
               ))}
             </div>

@@ -112,6 +112,7 @@ export function OverviewView() {
   const tHotels = useTranslations('hotels');
   const tBookings = useTranslations('bookings');
   const tCommon = useTranslations('common');
+  const tAlerts = useTranslations('alerts');
   const locale = useLocale();
   const labels = useCatalogLabels();
   const { hotelId } = useHotelScope();
@@ -147,7 +148,7 @@ export function OverviewView() {
     );
   }
 
-  const { stats, recentBookings, alerts } = data;
+  const { stats, recentBookings, alerts, accountWide } = data;
 
   return (
     <div className="flex flex-col gap-5">
@@ -171,6 +172,14 @@ export function OverviewView() {
           </div>
         }
       />
+
+      {/* The overview endpoint takes no hotel filter, so a selected hotel
+          narrows the alerts but not the numbers. Say which is which. */}
+      {accountWide ? (
+        <p className="rounded-[var(--radius-ctl)] border border-info/35 bg-info-soft px-3.5 py-2.5 text-[12.5px] text-ink">
+          {tAlerts('overviewAccountWide')}
+        </p>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiTile
@@ -254,20 +263,14 @@ export function OverviewView() {
                         {formatDateShort(booking.checkOut, locale)}
                       </td>
                       <td className="px-4 py-2.5">
-                        <Chip
-                          tone={
-                            booking.status === 'cancelled'
-                              ? 'danger'
-                              : booking.status === 'pending'
-                                ? 'draft'
-                                : 'active'
-                          }
-                        >
-                          {labels.bookingStatus(booking.status)}
+                        <Chip tone={booking.tone}>
+                          {booking.status
+                            ? labels.bookingStatus(booking.status)
+                            : booking.statusLabel}
                         </Chip>
                       </td>
                       <td className="px-4 py-2.5 text-end font-semibold text-ink latn">
-                        {formatMoney(booking.total, booking.currency, locale)}
+                        {formatMoney(booking.total ?? undefined, booking.currency, locale)}
                       </td>
                     </tr>
                   ))}

@@ -97,23 +97,39 @@ export const hotelNearbyPlaceSchema = z.object({
 
 /* -- guest-generated, READ-ONLY in the dashboard --------------------------- */
 
-const score10 = z.number().min(0).max(10);
+/**
+ * Guest scores are 1-5, confirmed against the API: `ratingValue` on a review
+ * and every sub-score in the review summary are stored on that scale. The
+ * dashboard displays them as-is rather than rescaling, so a 4 the guest gave
+ * is the 4 the owner reads.
+ */
+const score5 = z.number().min(0).max(5);
 
+/**
+ * Two vocabularies live here. The first six are what the API's review summary
+ * actually reports; the rest are the older hotel-style categories the mock
+ * data still carries. Every key is optional and the UI renders only the ones
+ * present, so neither source has to pretend to have scores it doesn't.
+ */
 export const hotelRatingBreakdownSchema = z.object({
-  staff: score10.optional(),
-  cleanliness: score10.optional(),
-  comfort: score10.optional(),
-  location: score10.optional(),
-  facilities: score10.optional(),
-  valueForMoney: score10.optional(),
-  freeWifi: score10.optional(),
+  cleanliness: score5.optional(),
+  accuracy: score5.optional(),
+  checkIn: score5.optional(),
+  communication: score5.optional(),
+  location: score5.optional(),
+  value: score5.optional(),
+  staff: score5.optional(),
+  comfort: score5.optional(),
+  facilities: score5.optional(),
+  valueForMoney: score5.optional(),
+  freeWifi: score5.optional(),
 });
 
 export const hotelReviewSchema = z.object({
   id: z.string().min(1),
   author: z.string().min(1),
   country: z.string().optional(),
-  score: score10,
+  score: score5,
   date: z.string().min(1),
   roomType: z.string().optional(),
   positive: z.string().optional(),
@@ -145,7 +161,7 @@ export const hotelSchema = z.object({
   policies: hotelPoliciesSchema.optional(),
   nearby: z.array(hotelNearbyPlaceSchema).optional(),
   /* read-only guest data */
-  rating: score10.optional(),
+  rating: score5.optional(),
   reviewCount: z.number().int().min(0).optional(),
   ratingBreakdown: hotelRatingBreakdownSchema.optional(),
   reviews: z.array(hotelReviewSchema).optional(),

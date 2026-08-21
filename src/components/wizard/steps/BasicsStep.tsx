@@ -14,6 +14,7 @@ import {
   TimeInput,
   Toggle,
 } from '@/components/ui/form';
+import { API_SUPPORTS } from '@/lib/api/capabilities';
 import { CURRENCIES } from '@/lib/catalogs';
 import { useCatalogLabels } from '@/lib/useLabels';
 import { useWizard } from '../WizardProvider';
@@ -21,7 +22,6 @@ import { PanelIntro } from './PanelIntro';
 
 export function BasicsStep() {
   const t = useTranslations('wizard.basics');
-  const tStep = useTranslations('wizard');
   const labels = useCatalogLabels();
   const { draft, update, errorsFor } = useWizard();
   const errors = errorsFor('basics');
@@ -161,9 +161,12 @@ export function BasicsStep() {
       </Card>
 
       {/* Policies live here rather than in their own step: they are short, and
-          the reference wizard keeps step 1 as the "everything textual" step. */}
+          the reference wizard keeps step 1 as the "everything textual" step.
+          The hotel create/edit endpoints take check-in/out times only, so the
+          rest is hidden until the API can store it — see API_SUPPORTS. */}
+      {API_SUPPORTS.hotelPolicies ? (
       <Card>
-        <CardHeader title={t('cardPolicies')} hint={tStep('steps.basicsSub')} />
+        <CardHeader title={t('cardPolicies')} />
         <CardBody>
           <Field label={t('cancellation')} htmlFor="policy-cancel">
             <TextInput
@@ -211,6 +214,7 @@ export function BasicsStep() {
           </Grid2>
         </CardBody>
       </Card>
+      ) : null}
     </>
   );
 }

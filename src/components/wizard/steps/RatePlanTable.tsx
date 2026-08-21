@@ -5,12 +5,14 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button, Chip, SubHeading } from '@/components/ui/primitives';
 import { NumberInput, Select } from '@/components/ui/form';
 import {
-  BOARD_BASES,
   CANCELLATION_IS_REFUNDABLE,
   CANCELLATION_PRESETS,
   DEFAULT_CURRENCY,
   type CancellationPreset,
 } from '@/lib/catalogs';
+import { BOARD_NAMES } from '@/lib/api/catalogMap';
+import { labelFor, useLookupOptions } from '@/lib/query/lookupOptions';
+import type { BoardBasis } from '@/lib/schemas/hotel';
 import { useCatalogLabels } from '@/lib/useLabels';
 import type { RoomTypeDraft } from '@/lib/schemas/draft';
 import { formatMoney } from '@/lib/utils';
@@ -38,6 +40,8 @@ export function RatePlanTable({
   const labels = useCatalogLabels();
   const locale = useLocale();
   const { draft, addRatePlan, updateRatePlan, removeRatePlan } = useWizard();
+  // The server decides which board bases exist — it has two we never listed.
+  const boards = useLookupOptions('boardBasis', BOARD_NAMES, labels.boardBasis);
 
   const planError = labels.validation(errors[`roomTypes[${roomIndex}].ratePlans`]);
 
@@ -67,15 +71,21 @@ export function RatePlanTable({
                   value={plan.boardBasis}
                   onChange={(e) =>
                     updateRatePlan(roomIndex, planIndex, {
-                      boardBasis: e.target.value as (typeof BOARD_BASES)[number],
+                      boardBasis: e.target.value as BoardBasis,
                     })
                   }
                   aria-label={t('colBoard')}
                   className="py-1.5 text-[13px] font-semibold"
+                  disabled={boards.isPending}
                 >
-                  {BOARD_BASES.map((basis) => (
-                    <option key={basis} value={basis}>
-                      {labels.boardBasis(basis)}
+                  {!boards.options.some((o) => o.value === plan.boardBasis) ? (
+                    <option value={plan.boardBasis}>
+                      {labelFor(plan.boardBasis, boards.options, labels.boardBasis)}
+                    </option>
+                  ) : null}
+                  {boards.options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </Select>

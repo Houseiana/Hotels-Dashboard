@@ -1,54 +1,61 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { UserButton } from '@clerk/nextjs';
-import { CircleUser, ShieldCheck } from 'lucide-react';
-import { Menu, MenuLabel, MenuSeparator } from '@/components/ui/Menu';
-import { CLERK_ENABLED } from '@/lib/auth';
+import { CircleUser, LogOut } from 'lucide-react';
+import { Menu, MenuItem, MenuLabel, MenuSeparator } from '@/components/ui/Menu';
+import { useSession } from '@/components/providers/SessionProvider';
+import { useRouter } from '@/i18n/navigation';
 
-/** Clerk's account menu, with a labelled stand-in when Clerk isn't configured. */
 export function AccountMenu() {
   const t = useTranslations('auth');
+  const { user, signOut } = useSession();
+  const router = useRouter();
 
-  if (CLERK_ENABLED) {
-    return (
-      <UserButton
-        appearance={{ elements: { avatarBox: 'size-[30px]' } }}
-        afterSignOutUrl="/"
-      />
-    );
-  }
+  const initials = (user?.name ?? user?.email ?? '')
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 
   return (
     <Menu
       align="end"
-      width="w-64"
+      width="w-60"
       trigger={({ toggle }) => (
         <button
           type="button"
           onClick={toggle}
           aria-label={t('account')}
-          className="grid size-[30px] place-items-center rounded-full border border-line-strong bg-accent-soft text-accent-ink"
+          className="grid size-[30px] place-items-center rounded-full border border-line-strong bg-accent-soft text-[11px] font-bold text-accent-ink"
         >
-          <CircleUser className="size-4" />
+          {initials || <CircleUser className="size-4" />}
         </button>
       )}
     >
-      {() => (
+      {(close) => (
         <>
           <MenuLabel>{t('account')}</MenuLabel>
           <div className="px-2.5 pb-2">
-            <p className="text-[13px] font-semibold text-ink">{t('mockOwner')}</p>
-            <p className="text-[11.5px] text-faint">{t('ownerAccess')}</p>
+            <p className="truncate text-[13px] font-semibold text-ink">
+              {user?.name ?? t('mockOwner')}
+            </p>
+            {user?.email ? (
+              <p className="truncate text-[11.5px] text-faint latn">{user.email}</p>
+            ) : null}
           </div>
           <MenuSeparator />
-          <div className="flex gap-2 rounded-[7px] bg-warn-soft p-2.5">
-            <ShieldCheck className="mt-px size-4 shrink-0 text-warn" />
-            <div>
-              <p className="text-[12px] font-semibold text-warn">{t('devModeTitle')}</p>
-              <p className="mt-0.5 text-[11.5px] leading-snug text-muted">{t('devModeBody')}</p>
-            </div>
-          </div>
+          <MenuItem
+            danger
+            icon={<LogOut className="size-4" />}
+            onClick={() => {
+              close();
+              signOut();
+              router.replace('/sign-in');
+            }}
+          >
+            {t('signOut')}
+          </MenuItem>
         </>
       )}
     </Menu>

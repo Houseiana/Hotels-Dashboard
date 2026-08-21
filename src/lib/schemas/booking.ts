@@ -48,6 +48,15 @@ export const dayInventorySchema = z.object({
   blocked: z.number().int().min(0),
   closed: z.boolean().optional(),
   minStay: z.number().int().min(1).optional(),
+  /** True when this night's price overrides the rate plan's base price. */
+  isSpecialPrice: z.boolean().optional(),
+});
+
+/** A rate plan the calendar can be priced against. */
+export const calendarRatePlanSchema = z.object({
+  id: z.string().min(1),
+  boardBasis: z.string().optional(),
+  basePrice: z.number().optional(),
 });
 
 export const availabilityCalendarSchema = z.object({
@@ -55,10 +64,17 @@ export const availabilityCalendarSchema = z.object({
   roomTypeId: z.string().min(1),
   totalUnits: z.number().int().min(0),
   currency: z.string().length(3),
+  /**
+   * Prices belong to a rate plan, not to the room type, so the calendar is
+   * always showing ONE plan's nightly rates. Empty in the mock, which prices
+   * the room type directly.
+   */
+  ratePlans: z.array(calendarRatePlanSchema).default([]),
   days: z.array(dayInventorySchema),
 });
 
 export type DayInventory = z.infer<typeof dayInventorySchema>;
+export type CalendarRatePlan = z.infer<typeof calendarRatePlanSchema>;
 export type AvailabilityCalendar = z.infer<typeof availabilityCalendarSchema>;
 
 /** Payload for the bulk editor: apply a change to a date range. */
@@ -111,6 +127,11 @@ export const accountSettingsSchema = z.object({
 
 export const settingsSchema = z.object({
   account: accountSettingsSchema,
+  /**
+   * Kept for the mock store only. The API models payouts as a LIST managed
+   * through its own create/edit/delete endpoints, so the real screen reads
+   * `usePayoutMethods` rather than this field.
+   */
   payout: payoutSettingsSchema,
   defaultPolicies: hotelPoliciesSchema,
 });
@@ -129,9 +150,14 @@ export const overviewStatsSchema = z.object({
   revenue: z.number().min(0),
   revenueCurrency: z.string().length(3),
   /** Currencies present in scope but excluded from `revenue` (no FX available). */
-  otherCurrencies: z.array(z.string().length(3)),
-  revenueChangePercent: z.number(),
-  occupancyChangePercent: z.number(),
+  otherCurrencies: z.array(z.string().length(3)).default([]),
+  /**
+   * Optional because `GET /api/hotels/overview` reports current figures with no
+   * prior period to compare against. The tiles hide the delta chip rather than
+   * showing a trend nobody measured.
+   */
+  revenueChangePercent: z.number().optional(),
+  occupancyChangePercent: z.number().optional(),
 });
 
 export const alertSchema = z.object({

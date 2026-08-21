@@ -34,9 +34,10 @@ export function ReviewStep() {
   const t = useTranslations('wizard.review');
   const tSteps = useTranslations('wizard.steps');
   const tCommon = useTranslations('common');
+  const tWizard = useTranslations('wizard');
   const labels = useCatalogLabels();
-  const { draft, goTo, issuesFor, publishIssues, canPublish, toHotel } = useWizard();
-  const { publish, saveDraft, busy } = usePublish();
+  const { draft, isNew, goTo, issuesFor, publishIssues, toHotel } = useWizard();
+  const { publish, saveDraft, busy, canPublish } = usePublish();
 
   const summaries: Record<Exclude<WizardStep, 'review'>, string> = {
     basics: t('summaryBasics', {
@@ -79,6 +80,15 @@ export function ReviewStep() {
   return (
     <>
       <PanelIntro title={t('title')} subtitle={t('subtitle')} />
+
+      {/* Saving an edit is a batch of calls — one per changed room and rate
+          plan — so it is worth saying up front that only differences go. */}
+      {!isNew ? (
+        <p className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-info/35 bg-info-soft p-4 text-[13px] text-ink">
+          <Info className="mt-0.5 size-4 shrink-0 text-info" />
+          {tWizard('editSaveNote')}
+        </p>
+      ) : null}
 
       <div
         className={cn(
@@ -164,7 +174,13 @@ export function ReviewStep() {
           <div className="mt-2 flex flex-wrap items-center gap-2.5">
             <Button variant="primary" onClick={publish} disabled={!canPublish || busy}>
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              {busy ? t('publishing') : draft.status === 'active' ? t('republish') : t('publish')}
+              {busy
+                ? t('publishing')
+                : !isNew
+                  ? t('saveChanges')
+                  : draft.status === 'active'
+                    ? t('republish')
+                    : t('publish')}
             </Button>
             <Button onClick={saveDraft} disabled={busy}>
               {t('saveDraft')}
