@@ -198,7 +198,12 @@
     "feeDeleteConfirm": "تحذف الخدمة دي؟",
     "feeSavedToast": "اتحفظت الخدمة.",
     "feeDeletedToast": "اتحذفت الخدمة.",
-    "feeMockNote": "الخدمات الإضافية متاحة مع الـ API الحقيقي بس."
+    "feeMockNote": "الخدمات الإضافية متاحة مع الـ API الحقيقي بس.",
+    "actionRestore": "استرجاع",
+    "restoreConfirmTitle": "ترجّع «{name}»؟",
+    "restoreConfirmBody": "الفندق هيرجع للحالة اللي كان عليها قبل الحذف. تقدر تحذفه تاني بعدين.",
+    "restoredToast": "رجع {name}.",
+    "deletedAlready": "الفندق ده محذوف. لازم ترجّعه الأول عشان تعدّله أو تنشره."
   },
   "wizard": {
     "newHotel": "فندق جديد · الإعداد",
@@ -512,9 +517,6 @@
     "confirmedToast": "تم تأكيد الحجز {reference}.",
     "cancelledToast": "تم إلغاء الحجز {reference}.",
     "countLabel": "{count, plural, zero {لا حجوزات} one {حجز واحد} two {حجزان} few {# حجوزات} many {# حجزًا} other {# حجز}}",
-    "mergedNote": "الـ API بيرجّع الحجوزات لكل فندق لوحده، فالقايمة دي متجمّعة من أحدث {perHotel} حجز في كل فندق ومترتّبة عندنا.",
-    "truncatedNote": "فيه فندق على الأقل عنده أكتر من كده، يعني حجوزات قديمة ناقصة — اختار فندق واحد عشان تتصفّحهم كلهم.",
-    "failedHotelsNote": "{count, plural, one {فندق واحد مردّش} other {# فنادق مردّوش}} وناقصين من القايمة.",
     "readOnlyNote": "الحجوزات هنا للعرض بس: الـ API مفيهوش endpoint لتأكيد حجز أو إلغائه."
   },
   "reviews": {

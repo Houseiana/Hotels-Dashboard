@@ -10,6 +10,7 @@ import {
   Pencil,
   Power,
   Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import {
@@ -26,7 +27,12 @@ import {
 import { ConfirmDialog } from '@/components/ui/overlay';
 import { GuestPreviewCard } from './GuestPreviewCard';
 import { HotelFeesCard } from './HotelFeesCard';
-import { useActivateHotel, useDeleteHotelById, useHotelDetail } from '@/lib/query/hooks';
+import {
+  useActivateHotel,
+  useDeleteHotelById,
+  useHotelDetail,
+  useRestoreHotel,
+} from '@/lib/query/hooks';
 import { useCurrencyLookup, useLookup } from '@/lib/query/lookups';
 import { useToast } from '@/components/providers/ToastProvider';
 import { useCatalogLabels } from '@/lib/useLabels';
@@ -52,6 +58,7 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
 
   const activate = useActivateHotel();
   const remove = useDeleteHotelById();
+  const restore = useRestoreHotel();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Reusing the wizard's loader keeps one definition of "what the API means".
@@ -145,7 +152,7 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
             <CalendarRange className="size-4" />
             {t('actionPricing')}
           </Button>
-          {!hotel.isActive ? (
+          {!hotel.isActive && !hotel.isDeleted ? (
             <Button
               variant="primary"
               disabled={activate.isPending}
@@ -160,10 +167,28 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
               {t('activate')}
             </Button>
           ) : null}
-          <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-            <Trash2 className="size-4" />
-            {tCommon('delete')}
-          </Button>
+          {/* `/delete` toggles, so a deleted hotel gets the opposite button
+              rather than a "delete" that would quietly bring it back. */}
+          {hotel.isDeleted ? (
+            <Button
+              variant="primary"
+              disabled={restore.isPending}
+              onClick={() =>
+                restore.mutate(hotelId, {
+                  onSuccess: () => toast(t('restoredToast', { name: hotel.name })),
+                  onError: () => toast(tCommon('somethingWentWrong'), 'error'),
+                })
+              }
+            >
+              <RotateCcw className="size-4" />
+              {t('actionRestore')}
+            </Button>
+          ) : (
+            <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+              <Trash2 className="size-4" />
+              {tCommon('delete')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -312,12 +337,16 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
           </Card>
 
           {/* Fees are managed here, not in the wizard: the API gives them their
-              own endpoints on an existing hotel, so each one saves on its own. */}
+              own endpoints on an existing hotel, so each one saves on its own.
+              A deleted hotel is skipped — its `/fees` endpoint answers 404
+              "Hotel not found", the same as its bookings. */}
+          {!hotel.isDeleted ? (
           <HotelFeesCard
             hotelId={hotelId}
             currency={currency}
             roomTypes={draft.roomTypes.map((room) => ({ id: room.id, name: room.name }))}
           />
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-4 lg:sticky lg:top-5 lg:self-start">

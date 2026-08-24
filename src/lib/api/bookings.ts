@@ -5,27 +5,22 @@ import { requestData, USE_MOCK, type Pagination } from './config';
 import * as mock from '../mock/db';
 
 /* ---------------------------------------------------------------------------
- * `GET /api/hotels/{hotelId}/bookings` and `GET /api/hotels/bookings/{id}`.
+ * `GET /api/hotels/bookings` — every booking across the manager's hotels, with
+ * an optional `hotelId` filter.
  *
- * The API is scoped PER HOTEL. The dashboard's Bookings screen is per manager
- * with an optional hotel filter, so when no hotel is picked this asks each of
- * the manager's hotels in turn and merges the answers.
+ * This screen used to fan out one request per hotel and merge the answers in
+ * the browser, because the API only spoke per hotel. The backend added this
+ * endpoint (and dropped the per-hotel one), so searching, filtering, sorting
+ * and paging are all the server's job again — which is the only way paging can
+ * actually be correct.
  *
- * That merge is honest but not free: sorting and paging happen in the browser
- * over the newest `PER_HOTEL_LIMIT` of each hotel, so a manager with many busy
- * hotels sees a recent slice rather than the true global ordering. The screen
- * says so. A single `GET /api/hotels/bookings` on the server would remove the
- * caveat entirely — see the backend notes in capabilities.ts.
- *
- * There is also NO endpoint for changing a booking's status anywhere under
- * HotelManagement, so the screen is read-only against the real API.
+ * Still missing: there is NO endpoint anywhere under HotelManagement for
+ * changing a booking's status, so the screen stays read-only.
  * ------------------------------------------------------------------------- */
 
-/** How many bookings to pull from each hotel when merging across all of them. */
-export const PER_HOTEL_LIMIT = 50;
-
 export type BookingsQuery = {
-  hotelId: string;
+  /** Omit for every hotel the token can see. */
+  hotelId?: string;
   search?: string;
   statusId?: number;
   fromDate?: string;
@@ -40,12 +35,13 @@ export type BookingsPage = {
 };
 
 export const bookingsApi = {
-  async listForHotel(query: BookingsQuery): Promise<BookingsPage> {
+  async list(query: BookingsQuery): Promise<BookingsPage> {
     const { data, pagination } = await requestData(
-      `/api/hotels/${query.hotelId}/bookings`,
+      '/api/hotels/bookings',
       z.array(apiBookingSchema),
       {
         query: {
+          hotelId: query.hotelId || undefined,
           search: query.search || undefined,
           statusId: query.statusId,
           fromDate: query.fromDate || undefined,
@@ -58,45 +54,13 @@ export const bookingsApi = {
     return { items: data, pagination };
   },
 
-  /**
-   * Every hotel's bookings in one list. Requests run in parallel; a hotel whose
-   * request fails contributes nothing rather than failing the whole screen,
-   * and the count of failures is returned so the screen can say so.
-   */
-  async listForManager(
-    hotelIds: string[],
-    query: Omit<BookingsQuery, 'hotelId' | 'page' | 'limit'>,
-  ): Promise<{ items: ApiBooking[]; failedHotels: number; truncated: boolean }> {
-    const results = await Promise.allSettled(
-      hotelIds.map((hotelId) =>
-        bookingsApi.listForHotel({ ...query, hotelId, page: 1, limit: PER_HOTEL_LIMIT }),
-      ),
-    );
-
-    const items: ApiBooking[] = [];
-    let failedHotels = 0;
-    let truncated = false;
-
-    for (const result of results) {
-      if (result.status !== 'fulfilled') {
-        failedHotels += 1;
-        continue;
-      }
-      items.push(...result.value.items);
-      const total = result.value.pagination?.total;
-      if (typeof total === 'number' && total > result.value.items.length) truncated = true;
-    }
-
-    return { items, failedHotels, truncated };
-  },
-
   /* -- NOT AVAILABLE ---------------------------------------------------------
    * HotelManagement has no booking status endpoint — no confirm, no cancel, no
    * check-in. This stays on the mock so that mode keeps working; the real
    * screen hides the actions rather than offering buttons that cannot work.
    * ------------------------------------------------------------------------ */
 
-  list(): Promise<Booking[]> {
+  listMock(): Promise<Booking[]> {
     return mock.listBookings();
   },
 

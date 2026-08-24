@@ -18,6 +18,7 @@ import {
   Rows3,
   Search,
   Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import {
@@ -35,6 +36,7 @@ import { ConfirmDialog } from '@/components/ui/overlay';
 import {
   useActivateHotel,
   useDeleteHotelById,
+  useRestoreHotel,
   useHotelList,
 } from '@/lib/query/hooks';
 import { useLookup } from '@/lib/query/lookups';
@@ -88,6 +90,7 @@ export function HotelsView() {
   const [page, setPage] = useState(1);
   const [view, setView] = useState<ViewMode>('grid');
   const [toDelete, setToDelete] = useState<HotelListItem | null>(null);
+  const [toRestore, setToRestore] = useState<HotelListItem | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
@@ -117,6 +120,7 @@ export function HotelsView() {
   );
 
   const removeHotel = useDeleteHotelById();
+  const restoreHotel = useRestoreHotel();
   const activateHotel = useActivateHotel();
 
   const items = query.data?.items ?? [];
@@ -137,15 +141,17 @@ export function HotelsView() {
         >
           {t('actionDetails')}
         </MenuItem>
-        <MenuItem
-          icon={<Pencil className="size-4" />}
-          onClick={() => {
-            close();
-            router.push(`/hotels/${hotel.id}/edit`);
-          }}
-        >
-          {t('actionEdit')}
-        </MenuItem>
+        {slug !== 'deleted' ? (
+          <MenuItem
+            icon={<Pencil className="size-4" />}
+            onClick={() => {
+              close();
+              router.push(`/hotels/${hotel.id}/edit`);
+            }}
+          >
+            {t('actionEdit')}
+          </MenuItem>
+        ) : null}
         {slug !== 'active' && slug !== 'deleted' ? (
           <MenuItem
             icon={<Power className="size-4" />}
@@ -170,16 +176,31 @@ export function HotelsView() {
           {t('actionPricing')}
         </MenuItem>
         <MenuSeparator />
-        <MenuItem
-          danger
-          icon={<Trash2 className="size-4" />}
-          onClick={() => {
-            close();
-            setToDelete(hotel);
-          }}
-        >
-          {t('actionDelete')}
-        </MenuItem>
+        {/* `/delete` is a toggle, so offering "delete" on an already-deleted
+            hotel would restore it. Only ever show the direction that matches
+            the hotel's current state. */}
+        {slug === 'deleted' ? (
+          <MenuItem
+            icon={<RotateCcw className="size-4" />}
+            onClick={() => {
+              close();
+              setToRestore(hotel);
+            }}
+          >
+            {t('actionRestore')}
+          </MenuItem>
+        ) : (
+          <MenuItem
+            danger
+            icon={<Trash2 className="size-4" />}
+            onClick={() => {
+              close();
+              setToDelete(hotel);
+            }}
+          >
+            {t('actionDelete')}
+          </MenuItem>
+        )}
       </>
     );
   };
@@ -483,6 +504,24 @@ export function HotelsView() {
         body={t('deleteConfirmBody')}
         confirmLabel={tCommon('delete')}
         busy={removeHotel.isPending}
+      />
+
+      <ConfirmDialog
+        open={Boolean(toRestore)}
+        onClose={() => setToRestore(null)}
+        onConfirm={() => {
+          if (!toRestore) return;
+          const { id, name } = toRestore;
+          restoreHotel.mutate(id, {
+            onSuccess: () => toast(t('restoredToast', { name })),
+            onError: () => toast(tCommon('somethingWentWrong'), 'error'),
+          });
+          setToRestore(null);
+        }}
+        title={toRestore ? t('restoreConfirmTitle', { name: toRestore.name }) : ''}
+        body={t('restoreConfirmBody')}
+        confirmLabel={t('actionRestore')}
+        busy={restoreHotel.isPending}
       />
     </div>
   );

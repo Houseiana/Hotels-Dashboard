@@ -116,14 +116,25 @@ export const hotelsApi = {
     return items.find((h) => h.name.trim().toLowerCase() === target)?.id ?? null;
   },
 
-  /** Soft-deletes; the row stays in the list with status "Deleted". */
-  async remove(id: string): Promise<void> {
+  /**
+   * TOGGLES the deleted flag. Despite the path, `/delete` is not idempotent:
+   * calling it on a hotel that is already deleted RESTORES it (the API answers
+   * "Hotel restored."). Callers must therefore know the current state — the UI
+   * only offers this as "delete" on a live hotel and as "restore" on a deleted
+   * one, or a second click would quietly undo the first.
+   *
+   * The delete itself is soft: the row stays in the list with status "Deleted".
+   */
+  async toggleDeleted(id: string): Promise<void> {
     if (USE_MOCK) return mock.deleteHotel(id);
     await request(`/api/hotels/${id}/delete`, z.unknown(), { method: 'POST' });
   },
 
-  /** Toggles the hotel's active flag — the API has no separate publish call. */
-  async activate(id: string): Promise<void> {
+  /**
+   * TOGGLES the active flag, same caveat as `toggleDeleted` — a second call
+   * deactivates ("Hotel deactivated."). There is no separate publish endpoint.
+   */
+  async toggleActive(id: string): Promise<void> {
     if (USE_MOCK) {
       await mock.setHotelStatus(id, 'active');
       return;

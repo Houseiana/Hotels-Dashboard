@@ -49,7 +49,16 @@ export function HotelScopeProvider({ children }: { children: ReactNode }) {
     { page: 1, limit: SWITCHER_LIMIT },
     { enabled: isReady && Boolean(managerId) },
   );
-  const hotels = useMemo(() => data?.items ?? [], [data]);
+  /**
+   * Deleted hotels are excluded from the switcher. They still appear in the
+   * Hotels list (every status is shown there on purpose), but their bookings,
+   * reviews and fees endpoints all answer 404 — so scoping the whole dashboard
+   * to one produced broken screens rather than an empty one.
+   */
+  const hotels = useMemo(
+    () => (data?.items ?? []).filter((hotel) => hotel.status !== 'Deleted'),
+    [data],
+  );
 
   // localStorage cannot be read during render (it does not exist on the
   // server), so the persisted scope is restored on mount.

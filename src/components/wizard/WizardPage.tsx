@@ -85,11 +85,15 @@ export function WizardPage({ hotelId }: { hotelId?: string }) {
   // The draft is built ONCE, when the provider mounts. Building it before the
   // vocabularies arrive would resolve every amenity and bed to nothing and
   // freeze that emptiness into the wizard — so an edit waits for them too.
+  //
+  // `isLoading`, not `isPending`: a query that is disabled reports "pending"
+  // forever, and the places query stays disabled until the hotel has a name.
+  // Waiting on `isPending` left a hotel that failed to load — or one with a
+  // blank name — showing a skeleton that never resolved.
   const lookupsPending =
-    amenities.isPending || bedType.isPending || currencies.isPending || places.isPending;
+    amenities.isLoading || bedType.isLoading || currencies.isLoading || places.isLoading;
 
-  if (hotelId && (detail.isPending || lookupsPending)) return <WizardSkeleton />;
-
+  // Check the failure first, or the skeleton wins and the screen stays blank.
   if (hotelId && detail.isError) {
     return (
       <div className="grid min-h-dvh place-items-center p-6">
@@ -106,6 +110,8 @@ export function WizardPage({ hotelId }: { hotelId?: string }) {
       </div>
     );
   }
+
+  if (hotelId && (detail.isPending || lookupsPending)) return <WizardSkeleton />;
 
   if (!hotelId && settings.isPending) return <WizardSkeleton />;
 

@@ -19,11 +19,8 @@ export const queryKeys = {
   bookings: {
     all: ['bookings'] as const,
     list: () => [...queryKeys.bookings.all, 'list'] as const,
-    forHotel: (hotelId: string, query: Record<string, unknown>) =>
-      [...queryKeys.bookings.all, 'hotel', hotelId, query] as const,
-    /** The merged view depends on WHICH hotels, so they are part of the key. */
-    forManager: (hotelIds: string[], query: Record<string, unknown>) =>
-      [...queryKeys.bookings.all, 'manager', [...hotelIds].sort().join(','), query] as const,
+    page: (query: Record<string, unknown>) =>
+      [...queryKeys.bookings.all, 'page', query] as const,
   },
   pricing: {
     all: ['pricing'] as const,

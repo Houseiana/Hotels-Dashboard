@@ -100,10 +100,25 @@ export function useCreateHotel(): UseMutationResult<
   });
 }
 
+/**
+ * Both of these hit endpoints that TOGGLE rather than set (see `hotelsApi`).
+ * They are named for the direction the caller intends, and the screens only
+ * offer the one that matches the hotel's current state — pressing "delete" on
+ * an already-deleted hotel would otherwise bring it back.
+ */
 export function useDeleteHotelById(): UseMutationResult<void, Error, string> {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => hotelsApi.remove(id),
+    mutationFn: (id: string) => hotelsApi.toggleDeleted(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.hotels.all }),
+  });
+}
+
+/** Same endpoint as delete; only offered when the hotel IS deleted. */
+export function useRestoreHotel(): UseMutationResult<void, Error, string> {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => hotelsApi.toggleDeleted(id),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.hotels.all }),
   });
 }
@@ -111,7 +126,16 @@ export function useDeleteHotelById(): UseMutationResult<void, Error, string> {
 export function useActivateHotel(): UseMutationResult<void, Error, string> {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => hotelsApi.activate(id),
+    mutationFn: (id: string) => hotelsApi.toggleActive(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.hotels.all }),
+  });
+}
+
+/** Same endpoint as activate; only offered when the hotel IS active. */
+export function useDeactivateHotel(): UseMutationResult<void, Error, string> {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => hotelsApi.toggleActive(id),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.hotels.all }),
   });
 }
@@ -190,7 +214,7 @@ export function useSetHotelStatus(): UseMutationResult<
 export function useDeleteHotel(): UseMutationResult<void, Error, string> {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => hotelsApi.remove(id),
+    mutationFn: (id: string) => hotelsApi.toggleDeleted(id),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: queryKeys.hotels.all });
     },
@@ -386,7 +410,7 @@ export function useReviewsScreen(
 export function useBookings(options: { enabled?: boolean } = {}): UseQueryResult<Booking[]> {
   return useQuery({
     queryKey: queryKeys.bookings.list(),
-    queryFn: () => bookingsApi.list(),
+    queryFn: () => bookingsApi.listMock(),
     enabled: options.enabled ?? true,
   });
 }
@@ -482,12 +506,6 @@ export type BookingsScreen = {
   rows: BookingRow[];
   total: number;
   totalPages: number;
-  /** True when rows were merged across hotels rather than paged by the server. */
-  merged: boolean;
-  /** Some hotel has more bookings than the per-hotel slice could carry. */
-  truncated: boolean;
-  /** How many hotels failed to answer during a merge. */
-  failedHotels: number;
   /** The API has no status-change endpoint, so actions are hidden. */
   canChangeStatus: boolean;
 };
@@ -567,6 +585,13 @@ function fromMockBooking(booking: Booking): BookingRow {
  * results are merged, sorted and paged here — `merged` tells the screen to say
  * so rather than implying server-side ordering.
  */
+/**
+ * The Bookings screen's data.
+ *
+ * One request. The API filters, sorts and pages across every hotel the token
+ * can see, and narrows to one hotel when `hotelId` is given — so nothing here
+ * has to reconcile results from several calls any more.
+ */
 export function useBookingsScreen(
   hotelId: string | undefined,
   filters: BookingFilters,
@@ -574,55 +599,29 @@ export function useBookingsScreen(
   /** False while the hotel scope is still being restored — see HotelScopeProvider. */
   ready = true,
 ): { data: BookingsScreen | undefined; isPending: boolean; isError: boolean } {
+  // Only to put a hotel name on rows that arrive without one.
   const list = useHotelList({ page: 1, limit: 100 }, { enabled: !USE_MOCK });
-  // A deleted hotel is still in the list (the Hotels screen shows every status)
-  // but its bookings endpoint answers 404 "Hotel not found" — so asking for it
-  // would only produce console errors and a false failure count.
-  const hotelIds = useMemo(
-    () =>
-      (list.data?.items ?? [])
-        .filter((hotel) => hotel.status !== 'Deleted')
-        .map((hotel) => hotel.id),
-    [list.data],
-  );
   const hotelNames = useMemo(
     () => new Map((list.data?.items ?? []).map((hotel) => [hotel.id, hotel.name])),
     [list.data],
   );
 
-  const single = useQuery({
-    queryKey: queryKeys.bookings.forHotel(hotelId ?? '', { ...filters, page }),
+  const query = useQuery({
+    queryKey: queryKeys.bookings.page({ hotelId: hotelId ?? '', ...filters, page }),
     queryFn: () =>
-      bookingsApi.listForHotel({
-        hotelId: hotelId as string,
-        ...filters,
-        page,
-        limit: BOOKINGS_PAGE_SIZE,
-      }),
-    enabled: ready && !USE_MOCK && Boolean(hotelId),
-    placeholderData: (previous) => previous,
-  });
-
-  const merged = useQuery({
-    queryKey: queryKeys.bookings.forManager(hotelIds, filters),
-    queryFn: () => bookingsApi.listForManager(hotelIds, filters),
-    enabled: ready && !USE_MOCK && !hotelId && hotelIds.length > 0,
+      bookingsApi.list({ hotelId, ...filters, page, limit: BOOKINGS_PAGE_SIZE }),
+    enabled: ready && !USE_MOCK,
     placeholderData: (previous) => previous,
   });
 
   const mock = useBookings({ enabled: USE_MOCK });
 
-  const isPending = USE_MOCK
-    ? mock.isPending
-    : !ready
-      ? true
-      : hotelId
-        ? single.isPending
-        : list.isPending || (hotelIds.length > 0 && merged.isPending);
-  const isError = USE_MOCK ? mock.isError : hotelId ? single.isError : merged.isError;
+  const isPending = USE_MOCK ? mock.isPending : !ready || query.isPending;
+  const isError = USE_MOCK ? mock.isError : query.isError;
 
   const data = useMemo<BookingsScreen | undefined>(() => {
     if (!ready) return undefined;
+
     if (USE_MOCK) {
       if (!mock.data) return undefined;
       const rows = mock.data
@@ -632,55 +631,19 @@ export function useBookingsScreen(
         rows,
         total: rows.length,
         totalPages: 1,
-        merged: false,
-        truncated: false,
-        failedHotels: 0,
         canChangeStatus: true,
       };
     }
 
-    if (hotelId) {
-      if (!single.data) return undefined;
-      return {
-        rows: single.data.items.map((booking) => fromApiBookingRow(booking, hotelNames)),
-        total: single.data.pagination?.total ?? single.data.items.length,
-        totalPages: single.data.pagination?.totalPages ?? 1,
-        merged: false,
-        truncated: false,
-        failedHotels: 0,
-        canChangeStatus: false,
-      };
-    }
-
-    if (hotelIds.length === 0) {
-      return {
-        rows: [],
-        total: 0,
-        totalPages: 0,
-        merged: false,
-        truncated: false,
-        failedHotels: 0,
-        canChangeStatus: false,
-      };
-    }
-    if (!merged.data) return undefined;
-
-    const all = merged.data.items
-      .map((booking) => fromApiBookingRow(booking, hotelNames))
-      // Newest first, by booking date where present and check-in otherwise.
-      .sort((a, b) => (a.createdAt ?? a.checkIn) < (b.createdAt ?? b.checkIn) ? 1 : -1);
-
-    const start = (page - 1) * BOOKINGS_PAGE_SIZE;
+    if (!query.data) return undefined;
     return {
-      rows: all.slice(start, start + BOOKINGS_PAGE_SIZE),
-      total: all.length,
-      totalPages: Math.max(1, Math.ceil(all.length / BOOKINGS_PAGE_SIZE)),
-      merged: true,
-      truncated: merged.data.truncated,
-      failedHotels: merged.data.failedHotels,
+      rows: query.data.items.map((booking) => fromApiBookingRow(booking, hotelNames)),
+      total: query.data.pagination?.total ?? query.data.items.length,
+      totalPages: query.data.pagination?.totalPages ?? 1,
+      // No endpoint exists for confirming or cancelling a booking.
       canChangeStatus: false,
     };
-  }, [ready, mock.data, single.data, merged.data, hotelId, hotelIds.length, hotelNames, page]);
+  }, [ready, mock.data, query.data, hotelId, hotelNames]);
 
   return { data, isPending, isError };
 }

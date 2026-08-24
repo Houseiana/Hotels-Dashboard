@@ -50,7 +50,7 @@ export function BookingsView() {
   const locale = useLocale();
   const labels = useCatalogLabels();
 
-  const { hotelId, hotels, isRestored } = useHotelScope();
+  const { hotelId, hotels, isRestored, isPending: scopePending } = useHotelScope();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -76,7 +76,10 @@ export function BookingsView() {
     effectiveHotel,
     { search: debouncedSearch, statusId, fromDate: from, toDate: to },
     page,
-    isRestored,
+    // The scope resolves the stored hotel against the hotel LIST, so waiting on
+    // `isRestored` alone still fires an unfiltered request first and a filtered
+    // one a moment later. Wait for both.
+    isRestored && !scopePending,
   );
 
   const isFiltered =
@@ -204,20 +207,6 @@ export function BookingsView() {
           </Button>
         ) : null}
       </div>
-
-      {/* The API has no "all my bookings" endpoint, so this view is stitched
-          together client-side. Better to say that than to imply the ordering
-          and counts are the server's. */}
-      {data?.merged ? (
-        <p className="flex items-start gap-2.5 rounded-[var(--radius-ctl)] border border-info/35 bg-info-soft px-3.5 py-2.5 text-[12.5px] text-ink">
-          <Info className="mt-px size-4 shrink-0 text-info" />
-          <span>
-            {t('mergedNote', { perHotel: 50 })}
-            {data.truncated ? ` ${t('truncatedNote')}` : ''}
-            {data.failedHotels > 0 ? ` ${t('failedHotelsNote', { count: data.failedHotels })}` : ''}
-          </span>
-        </p>
-      ) : null}
 
       {isPending ? (
         <Skeleton className="h-[420px]" />

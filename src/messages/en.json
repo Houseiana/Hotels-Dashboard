@@ -198,7 +198,12 @@
     "feeDeleteConfirm": "Remove this extra?",
     "feeSavedToast": "Extra saved.",
     "feeDeletedToast": "Extra removed.",
-    "feeMockNote": "Extras are only available against the live API."
+    "feeMockNote": "Extras are only available against the live API.",
+    "actionRestore": "Restore",
+    "restoreConfirmTitle": "Restore \"{name}\"?",
+    "restoreConfirmBody": "The hotel goes back to the state it had before it was deleted. You can delete it again afterwards.",
+    "restoredToast": "{name} is back.",
+    "deletedAlready": "This hotel is deleted. Restore it before you can edit or publish it."
   },
   "wizard": {
     "newHotel": "New hotel · setup",
@@ -512,9 +517,6 @@
     "confirmedToast": "Booking {reference} confirmed.",
     "cancelledToast": "Booking {reference} cancelled.",
     "countLabel": "{count, plural, one {# booking} other {# bookings}}",
-    "mergedNote": "The API returns bookings one hotel at a time, so this list is stitched together from the newest {perHotel} of each of your hotels and sorted here.",
-    "truncatedNote": "At least one hotel has more than that, so older bookings are missing — pick a single hotel to page through all of them.",
-    "failedHotelsNote": "{count, plural, one {# hotel did not respond} other {# hotels did not respond}} and is missing from this list.",
     "readOnlyNote": "Bookings are read-only here: the API has no endpoint for confirming or cancelling one."
   },
   "reviews": {

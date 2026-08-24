@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { loadSession } from '../auth/session';
+import { clearSession, loadSession } from '../auth/session';
 
 /**
  * Flip to a real backend by setting NEXT_PUBLIC_USE_MOCK=false. Nothing above
@@ -36,6 +36,27 @@ export class ApiError extends Error {
 function authHeader(): Record<string, string> {
   const token = loadSession()?.token;
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * The server rejecting our token is the end of the session.
+ *
+ * Without this the dashboard just sat there: every panel showed an error, and
+ * the sign-in page redirected back because a cookie still existed. Clearing
+ * the session and going to sign-in is the only state the user can act on.
+ *
+ * Guarded so a page full of failing queries triggers one navigation, not one
+ * per query.
+ */
+let signingOut = false;
+
+function endSession(): void {
+  if (typeof window === 'undefined' || signingOut) return;
+  signingOut = true;
+  clearSession();
+  const locale = window.location.pathname.split('/')[1] || 'en';
+  const target = `/${locale}/sign-in`;
+  if (!window.location.pathname.startsWith(target)) window.location.assign(target);
 }
 
 /* -- responses ------------------------------------------------------------- */
@@ -122,6 +143,7 @@ export async function request<T>(
 
   if (!response.ok) {
     const body = await response.json().catch(() => undefined);
+    if (response.status === 401) endSession();
     throw new ApiError(
       describeError(body, `${options.method ?? 'GET'} ${path} failed with ${response.status}`),
       response.status,
