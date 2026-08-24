@@ -36,7 +36,8 @@ export function ReviewStep() {
   const tCommon = useTranslations('common');
   const tWizard = useTranslations('wizard');
   const labels = useCatalogLabels();
-  const { draft, isNew, goTo, issuesFor, publishIssues, toHotel } = useWizard();
+  const { draft, isNew, goTo, issuesFor, publishIssues, toHotel, hasLocalDraft, discardLocalDraft } =
+    useWizard();
   const { publish, saveDraft, busy, canPublish } = usePublish();
 
   const summaries: Record<Exclude<WizardStep, 'review'>, string> = {
@@ -88,6 +89,21 @@ export function ReviewStep() {
           <Info className="mt-0.5 size-4 shrink-0 text-info" />
           {tWizard('editSaveNote')}
         </p>
+      ) : null}
+
+      {/* The save diffs against the SERVER record. If this wizard opened from a
+          draft kept in the browser, anything changed elsewhere since would be
+          written back to the old value — so say so and offer a way out. */}
+      {hasLocalDraft ? (
+        <div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-warn/40 bg-warn-soft p-4 text-[13px] text-ink">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" />
+          <span className="flex flex-col items-start gap-2">
+            {tWizard('localDraftNote')}
+            <Button size="sm" variant="ghost" onClick={discardLocalDraft}>
+              {tWizard('localDraftDiscard')}
+            </Button>
+          </span>
+        </div>
       ) : null}
 
       <div

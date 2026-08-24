@@ -71,6 +71,9 @@ export function detailToDraft(
         id: plan.id,
         boardBasis: board as RoomTypeDraft['ratePlans'][number]['boardBasis'],
         pricePerNight: price,
+        // Kept so a save writes the plan back in the currency it was priced
+        // in, not whatever the hotel's default happens to be.
+        currencyId: nz(plan.currencyId),
         refundable,
         breakfastIncluded: board !== 'roomOnly',
       };

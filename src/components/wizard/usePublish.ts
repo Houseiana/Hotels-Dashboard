@@ -40,11 +40,14 @@ export function usePublish() {
           return;
         }
         const failed = result.steps.filter((step) => !step.ok);
+        // Some failures are ours, not the server's, and carry a message key.
+        const firstError = failed[0]?.error ?? '';
+        const reason = tWizard.has(firstError) ? tWizard(firstError) : firstError;
         toast(
           tWizard('savePartial', {
             done: result.steps.length - failed.length,
             total: result.steps.length,
-            first: failed[0]?.error ?? '',
+            first: reason,
           }),
           'error',
         );

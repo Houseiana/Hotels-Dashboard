@@ -57,7 +57,7 @@ export function GuestPreviewCard({
       <div className="flex flex-col gap-2 px-[15px] py-3.5">
         <Stars value={hotel.starRating as number | undefined} size={13} />
         <p className="font-serif text-[17px] font-semibold tracking-[-.01em] text-ink">
-          {hotel.name || t('noReviewsYet')}
+          {hotel.name || t('untitledHotel')}
         </p>
         <p className="flex items-center gap-1.5 text-[12.5px] text-muted">
           <MapPin className="size-3" />

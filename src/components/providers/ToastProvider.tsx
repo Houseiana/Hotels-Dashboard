@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { CheckCircle2, Info, TriangleAlert, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 type ToastTone = 'success' | 'error' | 'info';
@@ -21,6 +22,7 @@ const ToastContext = createContext<{
 let nextId = 0;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const tCommon = useTranslations('common');
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const dismiss = useCallback((id: number) => {
@@ -71,7 +73,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               type="button"
               onClick={() => dismiss(t.id)}
               className="-me-1 -mt-1 rounded p-1 text-faint transition hover:text-ink"
-              aria-label="dismiss"
+              aria-label={tCommon('dismiss')}
             >
               <X className="size-3.5" />
             </button>

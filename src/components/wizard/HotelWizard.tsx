@@ -83,7 +83,13 @@ export function HotelWizard() {
     <div className="flex min-h-dvh flex-col bg-bg">
       {/* top bar — brand, breadcrumb, live save state */}
       <div className="sticky top-0 z-30 flex items-center gap-3.5 border-b border-line bg-surface px-4 py-3 sm:px-6">
-        <Link href="/hotels" className="flex items-center gap-2.5 font-semibold text-ink">
+        {/* The footer's Exit flushes the autosave; this one has to as well, or
+            up to a debounce interval of typing leaves with the page. */}
+        <Link
+          href="/hotels"
+          onClick={() => saveDraftNow()}
+          className="flex items-center gap-2.5 font-semibold text-ink"
+        >
           <Image src="/logo.png" alt="" width={27} height={48} className="h-[26px] w-auto" />
           <span className="hidden sm:inline">{tCommon('backToDashboard')}</span>
         </Link>

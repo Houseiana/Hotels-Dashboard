@@ -56,12 +56,24 @@ export function photoStyle(photo: string | undefined): CSSProperties {
 
 export function formatMoney(
   value: number | undefined,
-  currency: string,
+  /**
+   * Undefined when the source genuinely did not say. The amount is then shown
+   * as a plain number rather than stamped with a currency nobody chose —
+   * inventing "EGP" on a hotel priced in something else is worse than silence.
+   */
+  currency: string | undefined,
   locale: string,
   opts: { compact?: boolean } = {},
 ): string {
   if (value === undefined || !Number.isFinite(value)) return '—';
-  return new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
+  const intlLocale = locale === 'ar' ? 'ar-EG' : 'en-US';
+  if (!currency) {
+    return new Intl.NumberFormat(intlLocale, {
+      maximumFractionDigits: value % 1 === 0 ? 0 : 2,
+      notation: opts.compact ? 'compact' : 'standard',
+    }).format(value);
+  }
+  return new Intl.NumberFormat(intlLocale, {
     style: 'currency',
     currency,
     maximumFractionDigits: value % 1 === 0 ? 0 : 2,
@@ -81,9 +93,30 @@ export function toISODate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Parses a date the API might send either way.
+ *
+ * The model says `yyyy-mm-dd`, but the same fields come back as full
+ * timestamps from some endpoints, and splitting those on "-" produced NaN
+ * rather than a date. Since `Intl.DateTimeFormat.format()` THROWS on an
+ * invalid date, that took down every screen showing a booking or a review.
+ *
+ * Returns an invalid Date for input it cannot read; callers check for it.
+ */
 export function fromISODate(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1);
+  const [datePart] = String(iso ?? '').split('T');
+  const [y, m, d] = datePart.split('-').map(Number);
+  if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+    return new Date(y, m - 1, d);
+  }
+  // Last resort: let the platform try the whole string. Anything that is
+  // not a string at all becomes an invalid date rather than the epoch.
+  return new Date(typeof iso === 'string' ? iso : NaN);
+}
+
+/** True when a Date came out of parsing unusable. */
+function isValidDate(date: Date): boolean {
+  return !Number.isNaN(date.getTime());
 }
 
 export function addDays(date: Date, days: number): Date {
@@ -93,18 +126,23 @@ export function addDays(date: Date, days: number): Date {
 }
 
 export function formatDate(iso: string, locale: string): string {
+  const date = fromISODate(iso);
+  // Showing the raw value beats crashing the page it appears on.
+  if (!isValidDate(date)) return iso ?? '';
   return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG' : 'en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  }).format(fromISODate(iso));
+  }).format(date);
 }
 
 export function formatDateShort(iso: string, locale: string): string {
+  const date = fromISODate(iso);
+  if (!isValidDate(date)) return iso ?? '';
   return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG' : 'en-GB', {
     day: '2-digit',
     month: 'short',
-  }).format(fromISODate(iso));
+  }).format(date);
 }
 
 export function nightsBetween(from: string, to: string): number {

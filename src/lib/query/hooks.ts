@@ -813,11 +813,15 @@ export function useSaveSettings(): UseMutationResult<Settings, Error, Settings> 
   // The account endpoint takes a currency ID; the dashboard speaks codes.
   const currencies = useCurrencyLookup();
   return useMutation({
-    mutationFn: (settings: Settings) =>
-      settingsApi.save(
-        settings,
-        currencies.data?.find((c) => c.code === settings.account.defaultCurrency)?.id,
-      ),
+    mutationFn: (settings: Settings) => {
+      const currencyId = currencies.data?.find(
+        (c) => c.code === settings.account.defaultCurrency,
+      )?.id;
+      // The endpoint takes an id. Posting `undefined` would drop the change
+      // while the screen said "saved" — fail loudly instead.
+      if (!currencyId) throw new Error('currencyNotAvailable');
+      return settingsApi.save(settings, currencyId);
+    },
     onSuccess: (saved) => {
       client.setQueryData(queryKeys.settings.detail(), saved);
     },

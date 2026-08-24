@@ -26,7 +26,7 @@ import {
 import { useToast } from '@/components/providers/ToastProvider';
 import { useCatalogLabels } from '@/lib/useLabels';
 import { REVIEW_CATEGORIES } from '@/lib/catalogs';
-import { cn, formatDate } from '@/lib/utils';
+import { cn, formatDate, formatNumber } from '@/lib/utils';
 
 /** Thresholds on the API's 1-5 scale, not the 1-10 one the design started on. */
 function scoreWord(score: number, t: (key: string) => string): string {
@@ -120,6 +120,7 @@ function ReplyBox({ hotelId, review }: { hotelId: string; review: ReviewRow }) {
 
 function BreakdownCard({ data }: { data: ReviewsScreen }) {
   const t = useTranslations('reviews');
+  const locale = useLocale();
   const labels = useCatalogLabels();
 
   // Only categories the source actually scored — the API reports six, the mock
@@ -134,7 +135,7 @@ function BreakdownCard({ data }: { data: ReviewsScreen }) {
       <CardBody>
         <div className="flex items-center gap-3 rounded-[var(--radius-ctl)] bg-surface-2 p-3">
           <span className="grid size-12 place-items-center rounded-[10px] bg-accent text-[19px] font-bold text-on-accent latn">
-            {data.average?.toFixed(1) ?? '—'}
+            {data.average !== null ? formatNumber(Number(data.average.toFixed(1)), locale) : '—'}
           </span>
           <span className="flex flex-col">
             <span className="text-[14px] font-semibold text-ink">
@@ -153,7 +154,7 @@ function BreakdownCard({ data }: { data: ReviewsScreen }) {
                   <div className="flex items-baseline justify-between text-[12.5px]">
                     <span className="text-muted">{labels.reviewCategory(category)}</span>
                     <span className="font-semibold text-ink latn">
-                      {value.toFixed(1)}
+                      {formatNumber(Number(value.toFixed(1)), locale)}
                       <small className="ms-0.5 font-normal text-faint">{t('outOfFive')}</small>
                     </span>
                   </div>
@@ -188,6 +189,15 @@ export function ReviewsView() {
   const [filter, setFilter] = useState<ReviewFilter>('all');
   const [sort, setSort] = useState<ReviewSort>('newest');
   const [page, setPage] = useState(1);
+
+  // Switching hotels in the top bar is a different result set. Without this the
+  // request keeps asking for page 4 of a hotel that has one page, and the empty
+  // answer reads as "no reviews".
+  const [pagedHotel, setPagedHotel] = useState(hotelId);
+  if (pagedHotel !== hotelId) {
+    setPagedHotel(hotelId);
+    setPage(1);
+  }
 
   const { data, isPending, isError } = useReviewsScreen(hotelId, filter, sort, page);
 
@@ -295,7 +305,7 @@ export function ReviewsView() {
                               : 'bg-danger',
                         )}
                       >
-                        {review.score.toFixed(1)}
+                        {formatNumber(Number(review.score.toFixed(1)), locale)}
                       </span>
                     ) : null}
                     <div className="flex min-w-0 flex-col gap-0.5">

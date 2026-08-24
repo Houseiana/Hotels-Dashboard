@@ -161,13 +161,17 @@ export async function applyHotelEdit(
 ): Promise<EditResult> {
   const steps: EditStep[] = [];
   const warnings: string[] = [];
+  /** Rooms whose new plans could not be built; reported, never swallowed. */
+  const incompletePlans: string[] = [];
 
   const amenityId = resolver(lookups.amenities, AMENITY_NAMES);
   const categoryId = resolver(lookups.roomCategory, CATEGORY_NAMES);
   const viewId = resolver(lookups.viewType, VIEW_NAMES);
   const bedId = resolver(lookups.bedType, BED_NAMES);
   const boardId = resolver(lookups.boardBasis, BOARD_NAMES);
-  const currencyId = lookups.currencies?.find((c) => c.code === draft.currency)?.id;
+  // Only used for plans that have no currency of their own (a plan the owner
+  // just added). An existing plan keeps the currency it was loaded with.
+  const draftCurrencyId = lookups.currencies?.find((c) => c.code === draft.currency)?.id;
 
   /** The API reads bed and board back as names; map a name to its id. */
   const idByName = (items: LookupItem[] | undefined) => {
@@ -205,7 +209,7 @@ export async function applyHotelEdit(
     return {
       boardBasis: board,
       basePrice: price,
-      currencyId,
+      currencyId: plan.currencyId ?? draftCurrencyId,
       cancellationPolicyType: policyId(preset),
       freeCancellationHours: rule?.freeCancellationHours,
       freeCancellationDays: rule?.freeCancellationDays,
@@ -306,7 +310,11 @@ export async function applyHotelEdit(
             amenityIds: slugAmenityIds(room.amenities),
             ratePlans: room.ratePlans.flatMap((plan) => {
               const body = planBody(plan);
-              return body ? [body] : [];
+              if (!body) {
+                incompletePlans.push(room.name);
+                return [];
+              }
+              return [body];
             }),
             coverPhoto: cover,
             photos: rest,
@@ -322,6 +330,10 @@ export async function applyHotelEdit(
     }
 
     await diffRatePlans(room, before, beforeDraft);
+  }
+
+  for (const room of new Set(incompletePlans)) {
+    steps.push({ kind: 'planCreate', subject: room, ok: false, error: 'ratePlanIncomplete' });
   }
 
   return { ok: steps.every((step) => step.ok), steps, warnings };
@@ -394,7 +406,18 @@ export async function applyHotelEdit(
 
     for (const plan of room.ratePlans) {
       const body = planBody(plan);
-      if (!body) continue;
+      if (!body) {
+        // A plan with no price (or a board the server no longer offers) cannot
+        // be sent. Recording it as a failed step is what stops the screen
+        // saying "saved" for something that never left the browser.
+        steps.push({
+          kind: 'planEdit',
+          subject: room.name,
+          ok: false,
+          error: 'ratePlanIncomplete',
+        });
+        continue;
+      }
       const existing = beforePlans.get(plan.id);
 
       if (!existing) {

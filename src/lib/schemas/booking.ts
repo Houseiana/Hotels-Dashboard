@@ -41,7 +41,11 @@ export type Booking = z.infer<typeof bookingSchema>;
 export const dayInventorySchema = z.object({
   /** ISO yyyy-mm-dd */
   date: z.string().min(1),
-  price: z.number().positive('pricePositive'),
+  /**
+   * Optional: a night whose rate plan has no price set has no price, and
+   * defaulting it to zero showed "EGP 0" and dragged the month's average down.
+   */
+  price: z.number().positive('pricePositive').optional(),
   priceWithoutDiscount: z.number().positive('pricePositive').optional(),
   discountPercent: z.number().min(0).max(100, 'discountRange').optional(),
   sold: z.number().int().min(0),

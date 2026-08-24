@@ -116,7 +116,10 @@ export function HotelsView() {
     { search: debouncedSearch, statusId, page, limit: PAGE_SIZE },
     // The list is scoped by the bearer token, so it only needs the session to
     // have been restored — not a manager id in the query.
-    { enabled: isReady },
+    // `statusId` is resolved from the HotelStatus lookup. Firing before it
+    // arrives sends an UNFILTERED request while the UI already says
+    // "Suspended", so the wrong rows appear under the right label.
+    { enabled: isReady && (status === 'all' || statusId !== undefined) },
   );
 
   const removeHotel = useDeleteHotelById();
@@ -376,7 +379,7 @@ export function HotelsView() {
                     </span>
                     <span className="block text-[15px] font-bold tracking-[-.01em] text-ink latn">
                       {hotel.fromPrice
-                        ? formatMoney(hotel.fromPrice, hotel.currencyCode ?? 'EGP', locale)
+                        ? formatMoney(hotel.fromPrice, hotel.currencyCode ?? undefined, locale)
                         : '—'}
                     </span>
                   </span>
@@ -425,7 +428,7 @@ export function HotelsView() {
                     <td className="px-4 py-3 text-muted latn">{hotel.roomTypesCount ?? 0}</td>
                     <td className="px-4 py-3 text-end font-semibold text-ink latn">
                       {hotel.fromPrice
-                        ? formatMoney(hotel.fromPrice, hotel.currencyCode ?? 'EGP', locale)
+                        ? formatMoney(hotel.fromPrice, hotel.currencyCode ?? undefined, locale)
                         : '—'}
                     </td>
                     <td className="px-4 py-3">

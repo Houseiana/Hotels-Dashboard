@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useHotelList } from '@/lib/query/hooks';
+import { statusSlug } from '@/lib/schemas/hotelApi';
 import { useSession } from './SessionProvider';
 import type { HotelListItem } from '@/lib/schemas/hotelApi';
 
@@ -56,7 +57,7 @@ export function HotelScopeProvider({ children }: { children: ReactNode }) {
    * to one produced broken screens rather than an empty one.
    */
   const hotels = useMemo(
-    () => (data?.items ?? []).filter((hotel) => hotel.status !== 'Deleted'),
+    () => (data?.items ?? []).filter((hotel) => statusSlug(hotel.status) !== 'deleted'),
     [data],
   );
 

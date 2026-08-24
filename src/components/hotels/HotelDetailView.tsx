@@ -31,8 +31,10 @@ import {
   useActivateHotel,
   useDeleteHotelById,
   useHotelDetail,
+  useHotelList,
   useRestoreHotel,
 } from '@/lib/query/hooks';
+import { statusSlug, type HotelStatusSlug } from '@/lib/schemas/hotelApi';
 import { useCurrencyLookup, useLookup } from '@/lib/query/lookups';
 import { useToast } from '@/components/providers/ToastProvider';
 import { useCatalogLabels } from '@/lib/useLabels';
@@ -40,9 +42,29 @@ import { detailToDraft } from '@/lib/api/hotelLoad';
 import { DEFAULT_CURRENCY } from '@/lib/catalogs';
 import { cn, formatMoney, parseBedConfig, photoStyle } from '@/lib/utils';
 
+/** Chip colours for the API's eight states — mirrors the Hotels list. */
+const STATUS_TONE: Record<HotelStatusSlug, 'active' | 'draft' | 'danger' | 'info' | 'neutral'> = {
+  active: 'active',
+  pending: 'info',
+  inactive: 'neutral',
+  actionRequired: 'draft',
+  draft: 'draft',
+  suspended: 'danger',
+  rejected: 'danger',
+  deleted: 'neutral',
+};
+
 export function HotelDetailView({ hotelId }: { hotelId: string }) {
   const t = useTranslations('hotels');
   const tCommon = useTranslations('common');
+  const tStatus = useTranslations('catalog.hotelStatus');
+  /**
+   * `GET /api/hotels/{id}` carries `isActive`/`isDeleted` but not the hotel's
+   * actual status, so a chip built from those two booleans called a Suspended
+   * or Rejected hotel "Draft". The list endpoint does return the real status —
+   * and it is usually already cached by the Hotels screen.
+   */
+  const list = useHotelList({ page: 1, limit: 100 });
   const tWizard = useTranslations('wizard');
   const tReview = useTranslations('wizard.review');
   const tErrors = useTranslations('errors');
@@ -100,12 +122,31 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
 
   const hotel = detail.data;
   const photos = draft.photos;
+  const summary = list.data?.items.find((item) => item.id === hotelId);
+  // Only the two states the detail response can prove, when the list is not
+  // available; anything else stays unlabelled rather than guessed.
+  const status: HotelStatusSlug | undefined = summary
+    ? statusSlug(summary.status)
+    : hotel.isDeleted
+      ? 'deleted'
+      : hotel.isActive
+        ? 'active'
+        : undefined;
   const currency =
     currencies.data?.find((c) => c.id === hotel.roomTypes[0]?.ratePlans[0]?.currencyId)?.code ??
     DEFAULT_CURRENCY;
 
+  /**
+   * The cheapest plan — but only across plans priced in the SAME currency as
+   * the one this page is labelled with. Taking the minimum across currencies
+   * compares numbers that are not comparable and produces a "from" price that
+   * means nothing.
+   */
+  const currencyId = hotel.roomTypes[0]?.ratePlans[0]?.currencyId ?? null;
   const prices = hotel.roomTypes
-    .flatMap((rt) => rt.ratePlans.map((rp) => rp.basePrice))
+    .flatMap((rt) => rt.ratePlans)
+    .filter((rp) => (rp.currencyId ?? null) === currencyId)
+    .map((rp) => rp.basePrice)
     .filter((p): p is number => typeof p === 'number');
   const fromPrice = prices.length ? Math.min(...prices) : undefined;
 
@@ -125,9 +166,13 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
             <h1 className="font-serif text-[24px] font-semibold tracking-[-.01em] text-ink">
               {hotel.name}
             </h1>
-            <Chip tone={hotel.isActive ? 'active' : 'draft'} dot>
-              {hotel.isActive ? t('statusActive') : t('statusDraft')}
-            </Chip>
+            {/* The list screen shows all eight API statuses; this one used to
+                show two, so a Suspended or Rejected hotel read as "Draft". */}
+            {status ? (
+              <Chip tone={STATUS_TONE[status]} dot>
+                {tStatus(status)}
+              </Chip>
+            ) : null}
           </div>
           {hotel.nameAr ? (
             <p dir="rtl" className="text-start text-[14px] text-muted">

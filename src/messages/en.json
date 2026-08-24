@@ -60,7 +60,8 @@
     "notSet": "Not set",
     "copy": "Copy",
     "copied": "Copied",
-    "backToDashboard": "Back to dashboard"
+    "backToDashboard": "Back to dashboard",
+    "dismiss": "Dismiss"
   },
   "nav": {
     "overview": "Overview",
@@ -203,7 +204,8 @@
     "restoreConfirmTitle": "Restore \"{name}\"?",
     "restoreConfirmBody": "The hotel goes back to the state it had before it was deleted. You can delete it again afterwards.",
     "restoredToast": "{name} is back.",
-    "deletedAlready": "This hotel is deleted. Restore it before you can edit or publish it."
+    "deletedAlready": "This hotel is deleted. Restore it before you can edit or publish it.",
+    "untitledHotel": "Untitled hotel"
   },
   "wizard": {
     "newHotel": "New hotel · setup",
@@ -404,7 +406,10 @@
     "savePartial": "Saved {done} of {total} changes. The rest did not go through: {first}",
     "warning": {
       "coverPhotoNeedsUpload": "The cover photo stays as it was — the API can only set a cover from a newly uploaded file, not from a photo it already holds."
-    }
+    },
+    "ratePlanIncomplete": "This rate plan has no price yet, so it was not saved.",
+    "localDraftNote": "You are looking at an unsaved draft kept in this browser, not the copy on the server. If the hotel was changed elsewhere since, saving will write your version over it.",
+    "localDraftDiscard": "Discard the draft and reload the server copy"
   },
   "pricing": {
     "title": "Pricing & availability",
@@ -592,7 +597,8 @@
     "payoutDeleteConfirm": "Remove this payout method?",
     "payoutSavedToast": "Payout method saved.",
     "payoutDeletedToast": "Payout method removed.",
-    "payoutLocalNote": "Your display language and default check-in times are kept in this browser — the account API has no field for them."
+    "payoutLocalNote": "Your display language and default check-in times are kept in this browser — the account API has no field for them.",
+    "currencyNotAvailable": "That currency is not one the server offers, so it was not saved. Pick another."
   },
   "validation": {
     "hotelNameRequired": "Enter the hotel name.",

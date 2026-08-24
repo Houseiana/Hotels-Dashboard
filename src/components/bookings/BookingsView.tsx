@@ -61,6 +61,14 @@ export function BookingsView() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<BookingRow | null>(null);
 
+  // Same reason as the Reviews screen: a hotel switch is a new result set, so
+  // the page number cannot carry over.
+  const [pagedHotel, setPagedHotel] = useState(hotelId);
+  if (pagedHotel !== hotelId) {
+    setPagedHotel(hotelId);
+    setPage(1);
+  }
+
   // Search is a server parameter now, so it is debounced rather than applied on
   // every keystroke.
   useEffect(() => {

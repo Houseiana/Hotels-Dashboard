@@ -106,7 +106,9 @@ export const pricingApi = {
       })),
       days: data.days.map((day) => ({
         date: day.date,
-        price: day.price ?? 0,
+        // A night with no price is not a night that costs nothing; `formatMoney`
+        // renders undefined as a dash, and the average skips it.
+        price: day.price ?? undefined,
         sold: day.unitsSold,
         blocked: day.unitsBlocked,
         isSpecialPrice: day.isSpecialPrice,

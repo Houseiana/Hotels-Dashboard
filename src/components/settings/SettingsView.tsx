@@ -50,20 +50,22 @@ export function SettingsView() {
   const tCommon = useTranslations('common');
   const { data, isPending, isError } = useSettings();
 
-  if (isPending || !data) {
-    return (
-      <div className="flex flex-col gap-5">
-        <PageHeader title={t('title')} subtitle={t('subtitle')} />
-        <Skeleton className="h-[460px]" />
-      </div>
-    );
-  }
-
+  // The failure has to be checked first: on error `data` is undefined, so a
+  // combined `isPending || !data` guard showed a skeleton that never resolved.
   if (isError) {
     return (
       <div className="flex flex-col gap-5">
         <PageHeader title={t('title')} subtitle={t('subtitle')} />
         <EmptyState title={tCommon('somethingWentWrong')} body={tCommon('retry')} />
+      </div>
+    );
+  }
+
+  if (isPending || !data) {
+    return (
+      <div className="flex flex-col gap-5">
+        <PageHeader title={t('title')} subtitle={t('subtitle')} />
+        <Skeleton className="h-[460px]" />
       </div>
     );
   }

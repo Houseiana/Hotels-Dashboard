@@ -27,6 +27,14 @@ import {
 const draftNumber = z.union([z.number(), z.nan(), z.undefined()]).optional();
 
 export const ratePlanDraftSchema = z.object({
+  /**
+   * The currency this plan is actually priced in, as the API's own id.
+   *
+   * Carried through the wizard untouched. Without it an edit resolved the
+   * currency from the draft's single hotel-level code and silently repriced
+   * plans that were stored in something else.
+   */
+  currencyId: z.union([z.number(), z.undefined()]).optional(),
   id: z.string(),
   name: z.string().optional(),
   boardBasis: boardBasisSchema,

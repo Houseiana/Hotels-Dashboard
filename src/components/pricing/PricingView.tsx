@@ -13,7 +13,15 @@ import { CALENDAR_YEAR } from '@/lib/api/pricing';
 import { USE_MOCK } from '@/lib/api/config';
 import { useCatalogLabels } from '@/lib/useLabels';
 import type { DayInventory } from '@/lib/schemas/booking';
-import { cn, daysInMonth, formatDate, formatMoney, toISODate } from '@/lib/utils';
+import {
+  cn,
+  daysInMonth,
+  formatDate,
+  formatMoney,
+  formatNumber,
+  fromISODate,
+  toISODate,
+} from '@/lib/utils';
 import { DayEditor } from './DayEditor';
 import { BulkEditor } from './BulkEditor';
 import { PricingEditor } from './PricingEditor';
@@ -144,7 +152,12 @@ export function PricingView() {
         : 0,
       soldOut: days.filter((d) => totalUnits - d.sold - d.blocked <= 0).length,
       withBlocks: days.filter((d) => d.blocked > 0).length,
-      avgRate: days.reduce((sum, d) => sum + d.price, 0) / nights,
+      // Averaged over the nights that HAVE a price, not over every night.
+      avgRate: (() => {
+        const priced = days.filter((d) => typeof d.price === 'number');
+        if (!priced.length) return undefined;
+        return priced.reduce((sum, d) => sum + (d.price as number), 0) / priced.length;
+      })(),
     };
   }, [calendar.data]);
 
@@ -192,7 +205,11 @@ export function PricingView() {
     );
   }
 
-  const firstWeekday = new Date(cursor.year, cursor.month, 1).getDay();
+  // Pad from the first night the server actually returned, not from the 1st.
+  // A partial month would otherwise render every date under the wrong weekday.
+  const firstDay = calendar.data?.days[0]?.date;
+  const firstWeekday = (firstDay ? fromISODate(firstDay) : new Date(cursor.year, cursor.month, 1))
+    .getDay();
   const monthStart = new Date(cursor.year, cursor.month, 1);
   const monthEnd = new Date(cursor.year, cursor.month, daysInMonth(cursor.year, cursor.month));
   const today = toISODate(new Date());
@@ -295,19 +312,19 @@ export function PricingView() {
             {[
               {
                 k: t('statAvgAvailable'),
-                n: stats.avgAvailable.toFixed(1),
+                n: formatNumber(Number(stats.avgAvailable.toFixed(1)), locale),
                 s: t('ofTotal', { total: calendar.data?.totalUnits ?? 0 }),
               },
-              { k: t('statOccupancy'), n: String(stats.occupancy), s: '%' },
+              { k: t('statOccupancy'), n: formatNumber(stats.occupancy, locale), s: '%' },
               {
                 k: t('statSoldOut'),
-                n: String(stats.soldOut),
+                n: formatNumber(stats.soldOut, locale),
                 s: t('ofNights', { count: stats.nights }),
                 warn: stats.soldOut > 0,
               },
               {
                 k: t('statBlocked'),
-                n: String(stats.withBlocks),
+                n: formatNumber(stats.withBlocks, locale),
                 s: t('ofNights', { count: stats.nights }),
               },
               {
@@ -459,11 +476,6 @@ export function PricingView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line bg-surface-2 px-5 py-3.5">
-          <code className="rounded-[7px] border border-line bg-surface px-2.5 py-1 font-mono text-[12px] text-ink latn">
-            <span className="font-bold text-open">GET</span> /api/room-types/
-            {activeRoomTypeId}/calendar?month={cursor.month + 1}
-            {ratePlan ? `&ratePlanId=${ratePlan.id}` : ''}
-          </code>
           <span className="text-[12px] text-muted">{t('formula')}</span>
         </div>
       </Card>
@@ -496,6 +508,7 @@ export function PricingView() {
           ) : null}
 
           <BulkEditor
+            key={`${cursor.year}-${cursor.month}`}
             open={bulkOpen}
             onClose={() => setBulkOpen(false)}
             hotelId={hotelId as string}
@@ -507,7 +520,7 @@ export function PricingView() {
         </>
       ) : (
         <PricingEditor
-          key={editing?.date ?? 'range'}
+          key={editing?.date ?? `range-${cursor.year}-${cursor.month}`}
           open={bulkOpen || editing !== null}
           onClose={() => {
             setBulkOpen(false);

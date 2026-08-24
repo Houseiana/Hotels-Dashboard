@@ -73,6 +73,10 @@ type WizardContextValue = {
    * this wizard is creating rather than editing.
    */
   saveEdit: (() => Promise<EditResult>) | null;
+  /** This wizard opened from a local draft, not from the server's copy. */
+  hasLocalDraft: boolean;
+  /** Throws the local draft away and reloads the server's version. */
+  discardLocalDraft: () => void;
   isSaving: boolean;
 };
 
@@ -165,11 +169,22 @@ export function WizardProvider({
   const draftKey = initialDraft?.id ?? NEW_DRAFT_KEY;
 
   const [draft, setDraft] = useState<HotelDraft>(() => {
-    // A draft in progress wins over the server copy — it is strictly newer.
+    // A draft in progress wins over the server copy — it is strictly newer
+    // than what this browser last saw. It is NOT necessarily newer than what
+    // the server holds now, so an edit says so rather than quietly diffing
+    // against a stale base (see `hasLocalDraft`).
     const stored = loadDraft(draftKey);
     if (stored) return stored;
     return initialDraft ?? emptyDraft(makeId('htl'), defaultCurrency ?? DEFAULT_CURRENCY);
   });
+
+  /**
+   * True when this wizard opened from a draft kept in this browser rather than
+   * from the server's copy. The edit screen warns about it: the save diffs
+   * against the server record, so anything changed elsewhere since the draft
+   * was written would be reverted without this being visible.
+   */
+  const [hasLocalDraft] = useState(() => Boolean(initialDraft) && Boolean(loadDraft(draftKey)));
 
   const [step, setStep] = useState<WizardStep>(initialStep ?? 'basics');
   const [attempted, setAttempted] = useState<Record<WizardStep, boolean>>(
@@ -366,6 +381,11 @@ export function WizardProvider({
 
   const [isEditing, setIsEditing] = useState(false);
 
+  const discardLocalDraft = useCallback(() => {
+    clearDraft(draftKey);
+    if (initialDraft) setDraft(initialDraft);
+  }, [draftKey, initialDraft]);
+
   const saveEdit = useCallback(async (): Promise<EditResult> => {
     if (!initialDetail) throw new Error('saveEdit called on a wizard that is creating');
     if (timer.current) clearTimeout(timer.current);
@@ -414,6 +434,8 @@ export function WizardProvider({
       saveDraftNow,
       submit,
       saveEdit: initialDetail && lookupsReady ? saveEdit : null,
+      hasLocalDraft,
+      discardLocalDraft,
       isSaving: createHotel.isPending || isEditing,
     }),
     [
@@ -441,6 +463,8 @@ export function WizardProvider({
       saveDraftNow,
       submit,
       saveEdit,
+      hasLocalDraft,
+      discardLocalDraft,
       initialDetail,
       lookupsReady,
       isEditing,
