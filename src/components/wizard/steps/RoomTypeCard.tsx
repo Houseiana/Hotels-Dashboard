@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ChevronDown, Plus, Trash2, X } from 'lucide-react';
 import { Button, Chip, SubHeading } from '@/components/ui/primitives';
@@ -16,7 +17,13 @@ import {
   TextInput,
 } from '@/components/ui/form';
 import { DEFAULT_CURRENCY } from '@/lib/catalogs';
-import { AMENITY_NAMES, BED_NAMES, CATEGORY_NAMES, VIEW_NAMES } from '@/lib/api/catalogMap';
+import {
+  BED_NAMES,
+  CATEGORY_NAMES,
+  ROOM_AMENITY_NAMES,
+  ROOM_SERVICE_NAMES,
+  VIEW_NAMES,
+} from '@/lib/api/catalogMap';
 import { labelFor, useLookupOptions } from '@/lib/query/lookupOptions';
 import { API_SUPPORTS } from '@/lib/api/capabilities';
 import { useCatalogLabels } from '@/lib/useLabels';
@@ -32,6 +39,31 @@ import {
 } from '@/lib/utils';
 import { useWizard } from '../WizardProvider';
 import { RatePlanTable } from './RatePlanTable';
+import { ServicesEditor } from './ServicesEditor';
+
+/**
+ * One labelled group inside an expanded room type.
+ *
+ * The panel carries about twenty controls. Ungrouped, an owner adding their
+ * first room meets them as a single wall — these headings say which question
+ * each run of fields is answering, in the order the questions get asked.
+ */
+function RoomSection({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-3 border-t border-line pt-4 first:border-0 first:pt-0">
+      <SubHeading hint={hint ? `· ${hint}` : undefined}>{title}</SubHeading>
+      {children}
+    </section>
+  );
+}
 
 export function RoomTypeCard({
   room,
@@ -56,7 +88,9 @@ export function RoomTypeCard({
   const categories = useLookupOptions('roomCategory', CATEGORY_NAMES, labels.category);
   const views = useLookupOptions('viewType', VIEW_NAMES, labels.view);
   const beds = useLookupOptions('bedType', BED_NAMES, labels.bedType);
-  const amenityOptions = useLookupOptions('amenities', AMENITY_NAMES, labels.roomAmenity);
+  // The room list is its own lookup now; the hotel one holds things like
+  // "Restaurant" and "Banquet Hall" that no single room has.
+  const amenityOptions = useLookupOptions('roomAmenities', ROOM_AMENITY_NAMES, labels.roomAmenity);
   const errors = errorsFor('rooms');
   const key = (field: string) => errors[`roomTypes[${index}].${field}`];
 
@@ -161,7 +195,8 @@ export function RoomTypeCard({
       </button>
 
       {open ? (
-        <div className="flex flex-col gap-4 border-t border-line px-4 pb-[18px] pt-4">
+        <div className="flex flex-col gap-5 border-t border-line px-4 pb-[18px] pt-4">
+          <RoomSection title={t('sectionIdentity')} hint={t('sectionIdentityHint')}>
           <Grid2>
             <Field
               label={t('name')}
@@ -187,7 +222,8 @@ export function RoomTypeCard({
             </Field>
           </Grid2>
 
-          <Grid3>
+
+          <Grid2>
             <Field label={t('category')} required error={labels.validation(key('category'))}>
               <Select
                 value={room.category}
@@ -231,6 +267,11 @@ export function RoomTypeCard({
               </Select>
             </Field>
 
+          </Grid2>
+          </RoomSection>
+
+          <RoomSection title={t('sectionCapacity')} hint={t('sectionCapacityHint')}>
+          <Grid3>
             <Field label={t('size')} error={labels.validation(key('sizeM2'))}>
               <NumberInput
                 value={room.sizeM2}
@@ -285,22 +326,6 @@ export function RoomTypeCard({
               />
             </Field>
           </Grid3>
-
-          <Grid2>
-            <Field label={t('description')}>
-              <TextArea
-                value={room.description ?? ''}
-                onChange={(e) => updateRoom(index, { description: e.target.value })}
-                placeholder={t('descriptionPlaceholder')}
-              />
-            </Field>
-            <Field label={t('descriptionAr')} labelHint="(العربية)">
-              <ArabicTextArea
-                value={room.descriptionAr ?? ''}
-                onChange={(e) => updateRoom(index, { descriptionAr: e.target.value })}
-              />
-            </Field>
-          </Grid2>
 
           <div className="flex flex-col gap-2">
             <SubHeading
@@ -378,6 +403,9 @@ export function RoomTypeCard({
             </div>
           </div>
 
+          </RoomSection>
+
+          <RoomSection title={t('sectionInside')} hint={t('sectionInsideHint')}>
           <div className="flex flex-col gap-2">
             <SubHeading hint={`· ${t('roomAmenitiesScope')}`}>{t('roomAmenities')}</SubHeading>
             <div className="flex flex-wrap gap-2">
@@ -393,7 +421,40 @@ export function RoomTypeCard({
             </div>
           </div>
 
+          <Grid2>
+            <Field label={t('description')}>
+              <TextArea
+                value={room.description ?? ''}
+                onChange={(e) => updateRoom(index, { description: e.target.value })}
+                placeholder={t('descriptionPlaceholder')}
+              />
+            </Field>
+            <Field label={t('descriptionAr')} labelHint="(العربية)">
+              <ArabicTextArea
+                value={room.descriptionAr ?? ''}
+                onChange={(e) => updateRoom(index, { descriptionAr: e.target.value })}
+              />
+            </Field>
+          </Grid2>
+          </RoomSection>
+
+          <RoomSection title={t('sectionSelling')} hint={t('sectionSellingHint')}>
           <RatePlanTable room={room} roomIndex={index} errors={errors} />
+
+          {/* Priced extras sold with this room type — its own endpoint, so
+              they are kept per room rather than on the hotel. */}
+          <ServicesEditor
+            bare
+            lookup="roomServices"
+            names={ROOM_SERVICE_NAMES}
+            label={labels.roomService}
+            value={room.services}
+            onChange={(services) => updateRoom(index, { services })}
+            currency={draft.currency || DEFAULT_CURRENCY}
+            title={t('roomServicesTitle')}
+          />
+
+          </RoomSection>
 
           <div>
             <Button variant="danger" size="sm" onClick={onRemove}>

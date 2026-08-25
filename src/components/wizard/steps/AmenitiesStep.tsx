@@ -9,6 +9,9 @@ import { AMENITY_NAMES } from '@/lib/api/catalogMap';
 import { useLookupOptions, type LookupOption } from '@/lib/query/lookupOptions';
 import { useCatalogLabels } from '@/lib/useLabels';
 import { useWizard } from '../WizardProvider';
+import { ServicesEditor } from './ServicesEditor';
+import { HOTEL_SERVICE_NAMES } from '@/lib/api/catalogMap';
+import { DEFAULT_CURRENCY } from '@/lib/catalogs';
 import { PanelIntro } from './PanelIntro';
 
 export function AmenitiesStep() {
@@ -106,6 +109,19 @@ export function AmenitiesStep() {
           );
         })
       )}
+
+      {/* Amenities say what the hotel HAS; services say what it charges for.
+          Same step, because an owner thinks about both as "what we offer". */}
+      <ServicesEditor
+        lookup="hotelServices"
+        names={HOTEL_SERVICE_NAMES}
+        label={labels.hotelService}
+        value={draft.services}
+        onChange={(services) => update({ services })}
+        currency={draft.currency || DEFAULT_CURRENCY}
+        title={t('cardServices')}
+        hint={t('servicesHint')}
+      />
 
       <p className="text-[11.5px] text-faint">
         {t('scopeNote', {

@@ -1,3 +1,10 @@
+/* WITHDRAWN BY THE BACKEND ------------------------------------------------
+ * Every route below was removed from the API on 2026-08-24, along with the
+ * HotelFeeType lookup, and replaced by house rules (see hotelsApi.assignPolicies).
+ * They all answer 404 now. Nothing calls this module; it is kept only so the
+ * shapes are on hand if fees come back.
+ * ------------------------------------------------------------------------ */
+
 import { z } from 'zod';
 import { hotelFeeSchema, type HotelFee } from '../schemas/hotelApi';
 import { request, requestData, USE_MOCK } from './config';

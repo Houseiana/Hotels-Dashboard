@@ -126,7 +126,7 @@ export function HotelWizard() {
       </div>
 
       {/* panels */}
-      <div className="mx-auto w-full max-w-wizard flex-1 px-4 pb-32 pt-6 sm:px-6">
+      <div className="mx-auto w-full max-w-wizard flex-1 pb-32 pt-6">
         <div className="fade-in flex flex-col gap-5" key={step}>
           {step === 'basics' ? <BasicsStep /> : null}
           {step === 'location' ? <LocationStep /> : null}

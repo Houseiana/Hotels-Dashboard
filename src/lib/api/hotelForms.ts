@@ -8,6 +8,12 @@
  * exactly one place.
  * ------------------------------------------------------------------------- */
 
+/** A paid extra as the WRITE side names it (`serviceId`, not `id`). */
+export type ServicePayload = {
+  serviceId: number;
+  price: number;
+};
+
 export type HotelRoomBedPayload = {
   bedType: number;
   count: number;
@@ -35,6 +41,7 @@ export type HotelRoomTypePayload = {
   beds?: HotelRoomBedPayload[];
   amenityIds?: number[];
   ratePlans?: RatePlanPayload[];
+  services?: ServicePayload[];
 };
 
 export type CreateHotelPayload = {
@@ -55,6 +62,28 @@ export type CreateHotelPayload = {
   longitude?: number;
   amenityIds?: number[];
   roomTypes?: HotelRoomTypePayload[];
+  /**
+   * House rules, sent with the hotel so they land atomically. They also have
+   * their own endpoint (`POST /api/hotels/{id}/policies`), which is what edits
+   * use — but create has no id yet, so carrying them here avoids depending on
+   * looking the new hotel back up.
+   */
+  policies?: Array<{ policyTypeId: number; allowed: boolean }>;
+  /** Hotel-wide paid extras; same atomic-create reasoning as policies. */
+  services?: ServicePayload[];
+  /** Same atomic-create reasoning again; edits use the dedicated endpoint. */
+  childrenPolicy?: {
+    childrenAllowed: boolean;
+    minChildAge?: number;
+    maxChildAge?: number;
+    rules: Array<{
+      minAge: number;
+      maxAge: number;
+      ordinal: number;
+      pricingMode: number;
+      value?: number;
+    }>;
+  };
   cover?: File;
   photos?: File[];
 };
@@ -111,6 +140,11 @@ function putObjects<T extends object>(
   (items ?? []).forEach((item, index) => write(form, `${key}[${index}]`, item));
 }
 
+function writeService(form: FormData, prefix: string, service: ServicePayload): void {
+  put(form, `${prefix}.serviceId`, service.serviceId);
+  put(form, `${prefix}.price`, service.price);
+}
+
 function writeRatePlan(form: FormData, prefix: string, plan: RatePlanPayload): void {
   put(form, `${prefix}.boardBasis`, plan.boardBasis);
   put(form, `${prefix}.basePrice`, plan.basePrice);
@@ -138,6 +172,7 @@ function writeRoomType(form: FormData, prefix: string, room: HotelRoomTypePayloa
   putAll(form, `${prefix}.amenityIds`, room.amenityIds);
   putObjects(form, `${prefix}.beds`, room.beds, writeBed);
   putObjects(form, `${prefix}.ratePlans`, room.ratePlans, writeRatePlan);
+  putObjects(form, `${prefix}.services`, room.services, writeService);
 }
 
 /** Fields shared by the create and edit forms. */
@@ -165,6 +200,24 @@ export function buildCreateHotelForm(payload: CreateHotelPayload): FormData {
   put(form, 'managerId', payload.managerId);
   writeCommon(form, payload);
   putObjects(form, 'roomTypes', payload.roomTypes, writeRoomType);
+  putObjects(form, 'services', payload.services, writeService);
+  if (payload.childrenPolicy) {
+    const cp = payload.childrenPolicy;
+    put(form, 'childrenPolicy.childrenAllowed', cp.childrenAllowed);
+    put(form, 'childrenPolicy.minChildAge', cp.minChildAge);
+    put(form, 'childrenPolicy.maxChildAge', cp.maxChildAge);
+    putObjects(form, 'childrenPolicy.rules', cp.rules, (f2, prefix, rule) => {
+      put(f2, `${prefix}.minAge`, rule.minAge);
+      put(f2, `${prefix}.maxAge`, rule.maxAge);
+      put(f2, `${prefix}.ordinal`, rule.ordinal);
+      put(f2, `${prefix}.pricingMode`, rule.pricingMode);
+      put(f2, `${prefix}.value`, rule.value);
+    });
+  }
+  putObjects(form, 'policies', payload.policies, (f, prefix, policy) => {
+    put(f, `${prefix}.policyTypeId`, policy.policyTypeId);
+    put(f, `${prefix}.allowed`, policy.allowed);
+  });
   put(form, 'cover', payload.cover);
   putAll(form, 'photos', payload.photos);
   return form;

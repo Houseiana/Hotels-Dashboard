@@ -26,45 +26,20 @@ import type { BoardBasis } from './schemas/hotel';
 
 export const AMENITY_GROUPS = [
   {
-    id: 'essentials',
-    items: ['wifi', 'airConditioning', 'heating', 'tv', 'elevator', 'workspace', 'iron', 'hairDryer'],
-  },
-  {
     id: 'facilities',
-    items: [
-      'pool',
-      'gym',
-      'exerciseEquipment',
-      'hotTub',
-      'jacuzzi',
-      'rooftop',
-      'privateGarden',
-      'balcony',
-      'fireplace',
-      'poolTable',
-      'piano',
-      'swing',
-    ],
+    items: ['swimmingPool', 'gym', 'spa', 'gardenTerrace', 'beachAccess', 'kidsPlayArea'],
   },
   {
-    id: 'kitchen',
-    items: ['kitchen', 'coffeeMaker', 'microwave', 'dishwasher', 'washer', 'dryer'],
+    id: 'foodDrink',
+    items: ['restaurant', 'cafe', 'barLounge'],
   },
   {
-    id: 'outdoor',
-    items: ['bbqGrill', 'firePit', 'outdoorShower', 'beachAccess', 'lakeAccess', 'skiInSkiOut'],
+    id: 'business',
+    items: ['businessCenter', 'meetingRooms', 'banquetHall'],
   },
-  { id: 'parking', items: ['freeParking'] },
   {
-    id: 'safety',
-    items: [
-      'security',
-      'securitySystem',
-      'smokeAlarm',
-      'firstAidKit',
-      'fireExtinguisher',
-      'carbonMonoxideAlarm',
-    ],
+    id: 'services',
+    items: ['freeWifi', 'parking', 'elevator', 'prayerRoom', 'wheelchairAccessible'],
   },
 ] as const;
 

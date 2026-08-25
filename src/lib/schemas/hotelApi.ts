@@ -69,6 +69,61 @@ const photoSchema = z.object({ id: z.string(), url: z.string() });
  * numeric. `bedType` is inconsistent — it can be either a name or the raw id as
  * a string, which is a known backend bug.
  */
+/**
+ * A house rule, as `GET /api/hotels/{id}` reads it back.
+ *
+ * The write side takes only `{ policyTypeId, allowed }`; the read side adds the
+ * type's display name, so a screen can render a hotel's rules without also
+ * holding the HotelPolicyTypes lookup.
+ */
+/**
+ * A paid extra, as the API reads it back: `{ id, name, price }`.
+ *
+ * Note the asymmetry — writes take `serviceId`, reads return `id`. Both
+ * refer to the same HotelServices / RoomServices lookup entry.
+ */
+export const hotelServiceSchema = z.object({
+  id: z.number(),
+  name: z.string().nullable().optional(),
+  price: z.number().nullable().optional(),
+});
+
+export type HotelService = z.infer<typeof hotelServiceSchema>;
+
+/**
+ * One age band of the children policy, as the API reads it back.
+ *
+ * `pricingMode` is a NAME on the way in and an integer id on the way out —
+ * the same asymmetry as every other lookup-backed field here. `value` is null
+ * for Free and As Adult, which the server enforces.
+ */
+export const childRuleSchema = z.object({
+  minAge: z.number(),
+  maxAge: z.number(),
+  /** Which child this band prices: 1st, 2nd, 3rd… Always at least 1. */
+  ordinal: z.number(),
+  pricingMode: z.string().nullable().optional(),
+  value: z.number().nullable().optional(),
+});
+
+export const childrenPolicySchema = z.object({
+  childrenAllowed: z.boolean().default(false),
+  minChildAge: z.number().nullable().optional(),
+  maxChildAge: z.number().nullable().optional(),
+  rules: z.array(childRuleSchema).default([]),
+});
+
+export type ChildRule = z.infer<typeof childRuleSchema>;
+export type ChildrenPolicy = z.infer<typeof childrenPolicySchema>;
+
+export const hotelPolicySchema = z.object({
+  policyTypeId: z.number(),
+  name: z.string().nullable().optional(),
+  allowed: z.boolean(),
+});
+
+export type HotelPolicy = z.infer<typeof hotelPolicySchema>;
+
 const roomTypeDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -86,6 +141,7 @@ const roomTypeDetailSchema = z.object({
     .default([]),
   amenityIds: z.array(z.number()).default([]),
   photos: z.array(photoSchema).default([]),
+  services: z.array(hotelServiceSchema).default([]),
   ratePlans: z
     .array(
       z.object({
@@ -115,6 +171,11 @@ export const hotelDetailSchema = z.object({
   streetAddress: z.string().nullable().optional(),
   postalCode: z.string().nullable().optional(),
   cityId: z.number().nullable().optional(),
+  // Added by the backend after we asked for them; the old workaround that
+  // fetched these from the LIST endpoint is gone.
+  cityName: z.string().nullable().optional(),
+  stateName: z.string().nullable().optional(),
+  countryName: z.string().nullable().optional(),
   area: z.string().nullable().optional(),
   villageId: z.number().nullable().optional(),
   latitude: z.number().nullable().optional(),
@@ -124,6 +185,9 @@ export const hotelDetailSchema = z.object({
   amenityIds: z.array(z.number()).default([]),
   photos: z.array(photoSchema).default([]),
   roomTypes: z.array(roomTypeDetailSchema).default([]),
+  policies: z.array(hotelPolicySchema).default([]),
+  services: z.array(hotelServiceSchema).default([]),
+  childrenPolicy: childrenPolicySchema.nullable().optional(),
 });
 
 export type HotelDetail = z.infer<typeof hotelDetailSchema>;

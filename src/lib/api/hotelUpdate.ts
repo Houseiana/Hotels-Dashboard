@@ -19,7 +19,7 @@ import {
   type RatePlanPayload,
 } from './hotelForms';
 import { hotelsApi } from './hotels';
-import type { SubmitLookups } from './hotelSubmit';
+import { childrenPolicyPayload, type SubmitLookups } from './hotelSubmit';
 import { parseBedConfig } from '../utils';
 
 /* ---------------------------------------------------------------------------
@@ -45,6 +45,10 @@ import { parseBedConfig } from '../utils';
 
 export type EditStepKind =
   | 'hotel'
+  | 'policies'
+  | 'services'
+  | 'childrenPolicy'
+  | 'roomServices'
   | 'roomCreate'
   | 'roomEdit'
   | 'roomDelete'
@@ -149,6 +153,7 @@ function planSignature(plan: RoomTypeDraft['ratePlans'][number]): string {
   return JSON.stringify({
     board: plan.boardBasis,
     price: num(plan.pricePerNight),
+    cancellation: plan.cancellation,
     refundable: plan.refundable,
   });
 }
@@ -204,7 +209,7 @@ export async function applyHotelEdit(
     const board = boardId(plan.boardBasis);
     const price = num(plan.pricePerNight);
     if (board === undefined || price === undefined) return undefined;
-    const preset = plan.refundable ? 'free24h' : 'nonRefundable';
+    const preset = plan.cancellation || (plan.refundable ? 'free24h' : 'nonRefundable');
     const rule = CANCELLATION_RULES[preset];
     return {
       boardBasis: board,
@@ -273,6 +278,59 @@ export async function applyHotelEdit(
     ),
   );
 
+  /* -- 1b. house rules ------------------------------------------------------
+   * Their own endpoint: `edit-hotel` has no policies field. The call replaces
+   * the whole set, so it only runs when the set actually differs — otherwise
+   * every save would rewrite rules nobody touched.
+   * ------------------------------------------------------------------------ */
+
+  const ruleKey = (rules: Array<{ policyTypeId: number; allowed: boolean }>) =>
+    JSON.stringify([...rules].sort((a, b) => a.policyTypeId - b.policyTypeId));
+
+  if (ruleKey(draft.houseRules) !== ruleKey(original.houseRules)) {
+    await run('policies', draft.name.trim() || detail.name, () =>
+      hotelsApi.assignPolicies(detail.id, draft.houseRules),
+    );
+  }
+
+  /* -- 1c. paid services ----------------------------------------------------
+   * Same shape as house rules: their own endpoint, replaces the whole set, so
+   * it only runs when the set differs.
+   * ------------------------------------------------------------------------ */
+
+  const serviceKey = (services: Array<{ serviceId: number; price: number }>) =>
+    JSON.stringify([...services].sort((a, b) => a.serviceId - b.serviceId));
+
+  if (serviceKey(draft.services) !== serviceKey(original.services)) {
+    await run('services', draft.name.trim() || detail.name, () =>
+      hotelsApi.assignServices(detail.id, draft.services),
+    );
+  }
+
+  /* -- 1d. children policy --------------------------------------------------
+   * Its own endpoint, and the server validates it hard (overlapping bands, age
+   * ranges, which modes may carry a value). Only sent when it differs.
+   * ------------------------------------------------------------------------ */
+
+  const childKey = (policy: HotelDraft['childrenPolicy']) =>
+    JSON.stringify({
+      allowed: policy.childrenAllowed,
+      min: policy.minChildAge,
+      max: policy.maxChildAge,
+      rules: [...policy.rules].sort(
+        (a, b) => a.ordinal - b.ordinal || a.minAge - b.minAge,
+      ),
+    });
+
+  if (childKey(draft.childrenPolicy) !== childKey(original.childrenPolicy)) {
+    const payload = childrenPolicyPayload(draft, lookups);
+    if (payload) {
+      await run('childrenPolicy', draft.name.trim() || detail.name, () =>
+        hotelsApi.assignChildrenPolicy(detail.id, payload),
+      );
+    }
+  }
+
   /* -- 2. rooms the owner removed ------------------------------------------- */
 
   const keptRoomIds = new Set(draft.roomTypes.map((room) => room.id));
@@ -327,6 +385,14 @@ export async function applyHotelEdit(
     const beforeDraft = originalDraftRooms.get(room.id);
     if (!beforeDraft || roomSignature(room) !== roomSignature(beforeDraft)) {
       await editExistingRoom(room, before);
+    }
+
+    // Room services are addressed by room-type id, so they can only be
+    // written for a room the server already has.
+    if (serviceKey(room.services) !== serviceKey(beforeDraft?.services ?? [])) {
+      await run('roomServices', room.name, () =>
+        hotelsApi.assignRoomServices(room.id, room.services),
+      );
     }
 
     await diffRatePlans(room, before, beforeDraft);

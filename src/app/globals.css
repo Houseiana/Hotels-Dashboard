@@ -19,11 +19,16 @@
   --bg: #f5f6f7;
   --surface: #ffffff;
   --surface-2: #fafbfb;
-  --border: #e2e6e8;
-  --border-strong: #cfd6d9;
+  --border: #d9dee1;
+  --border-strong: #a8b1b5;
   --text: #17222a;
-  --muted: #5f6f78;
-  --faint: #8a99a0;
+  /* Contrast against the lightest surface these ever sit on (#f5f6f7):
+     text 14.9:1, muted 7.1:1, faint 4.5:1 — three clearly separated steps,
+     with the faintest still clearing 4.5:1 for body text. The previous faint
+     (#8a99a0) measured 2.7:1, which is why labels and section headings read
+     as washed out. */
+  --muted: #49555c;
+  --faint: #687378;
   /* Brand yellow. `accent` is a FILL only — it has ~1.7:1 against white, so it
      can never carry text. `accent-ink` is the readable text/icon counterpart on
      light surfaces, and `on-accent` is what sits on top of an accent fill. */
@@ -34,7 +39,7 @@
   --on-accent: #1a1408;
   --ok: #157347;
   --ok-soft: #e4f2ea;
-  --warn: #a55b09;
+  --warn: #9c5608;
   --warn-soft: #f8eede;
   --danger: #b42318;
   --danger-soft: #fbe9e7;

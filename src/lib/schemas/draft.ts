@@ -26,6 +26,37 @@ import {
 /** A number input that is allowed to be empty while the owner is still typing. */
 const draftNumber = z.union([z.number(), z.nan(), z.undefined()]).optional();
 
+/**
+ * The children policy the wizard edits.
+ *
+ * `pricingMode` is held as our slug so the UI can label it; it becomes the
+ * lookup's integer id on save. `value` stays undefined for the modes the API
+ * refuses a value for.
+ */
+export const childRuleDraftSchema = z.object({
+  minAge: z.number(),
+  maxAge: z.number(),
+  ordinal: z.number(),
+  pricingMode: z.string(),
+  value: z.union([z.number(), z.undefined()]).optional(),
+});
+
+export const childrenPolicyDraftSchema = z.object({
+  childrenAllowed: z.boolean(),
+  minChildAge: draftNumber,
+  maxChildAge: draftNumber,
+  rules: z.array(childRuleDraftSchema),
+});
+
+/**
+ * A paid extra the owner has priced. Held in the draft so the wizard can edit
+ * hotel- and room-level services before anything is saved.
+ */
+export const serviceDraftSchema = z.object({
+  serviceId: z.number(),
+  price: z.number(),
+});
+
 export const ratePlanDraftSchema = z.object({
   /**
    * The currency this plan is actually priced in, as the API's own id.
@@ -41,6 +72,14 @@ export const ratePlanDraftSchema = z.object({
   pricePerNight: draftNumber,
   priceWithoutDiscount: draftNumber,
   discountPercent: draftNumber,
+  /**
+   * The cancellation preset the owner picked, e.g. "free48h".
+   *
+   * `refundable` below is derived from it and kept for the shared guest model.
+   * Storing only the boolean lost the window: every refundable plan came back
+   * as 24 hours whatever was chosen.
+   */
+  cancellation: z.string(),
   refundable: z.boolean(),
   breakfastIncluded: z.boolean(),
 });
@@ -64,6 +103,7 @@ export const roomTypeDraftSchema = z.object({
   photos: z.array(z.string()),
   refundable: z.boolean().optional(),
   breakfastIncluded: z.boolean().optional(),
+  services: z.array(serviceDraftSchema),
   ratePlans: z.array(ratePlanDraftSchema),
 });
 
@@ -98,6 +138,18 @@ export const hotelDraftSchema = z.object({
   amenities: z.array(z.string()),
   roomTypes: z.array(roomTypeDraftSchema),
   policies: hotelPoliciesSchema.optional(),
+  /**
+   * The API's house rules: which of the HotelPolicyTypes this hotel allows.
+   *
+   * Deliberately separate from `policies` above, which holds check-in times and
+   * the free-text notes the guest app renders. These are a fixed list the server
+   * owns, and they are written through their own endpoint rather than with the
+   * rest of the hotel.
+   */
+  houseRules: z.array(z.object({ policyTypeId: z.number(), allowed: z.boolean() })),
+  /** Hotel-wide paid extras; room-level ones live on each room type. */
+  services: z.array(serviceDraftSchema),
+  childrenPolicy: childrenPolicyDraftSchema,
   nearby: z.array(hotelNearbyPlaceSchema).optional(),
   rating: z.number().optional(),
   reviewCount: z.number().optional(),
@@ -309,6 +361,11 @@ export function hotelToDraft(hotel: Hotel): HotelDraft {
     ...hotel,
     nameAr: hotel.nameAr ?? '',
     descriptionAr: hotel.descriptionAr ?? '',
+    // The shared guest model has no house rules; they come from the API's own
+    // record, so a hotel rebuilt from the guest model starts with none.
+    houseRules: [],
+    services: [],
+    childrenPolicy: { childrenAllowed: false, minChildAge: 0, maxChildAge: 12, rules: [] },
     area: '',
     buildingNo: '',
     postalCode: '',
@@ -317,7 +374,14 @@ export function hotelToDraft(hotel: Hotel): HotelDraft {
       nameAr: rt.nameAr ?? '',
       description: rt.description ?? '',
       descriptionAr: rt.descriptionAr ?? '',
-      ratePlans: rt.ratePlans.map((rp) => ({ ...rp })),
+      // Paid extras come from the API record, not the shared guest model.
+      services: [],
+      // The shared guest model carries only `refundable`, so the window it was
+      // set with is unknown here; the nearest preset stands in.
+      ratePlans: rt.ratePlans.map((rp) => ({
+        ...rp,
+        cancellation: rp.refundable ? 'free24h' : 'nonRefundable',
+      })),
     })),
   };
 }
@@ -349,6 +413,11 @@ export function emptyDraft(id: string, currency: string = DEFAULT_CURRENCY): Hot
     amenities: [],
     roomTypes: [],
     policies: { checkInFrom: '15:00', checkOutUntil: '12:00' },
+    // Empty means "not answered yet", not "everything forbidden" — a rule only
+    // reaches the server once the owner actually sets it.
+    houseRules: [],
+    services: [],
+    childrenPolicy: { childrenAllowed: false, minChildAge: 0, maxChildAge: 12, rules: [] },
     nearby: [],
   };
 }

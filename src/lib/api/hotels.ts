@@ -170,6 +170,80 @@ export const hotelsApi = {
    * out which of these to call; this layer just speaks HTTP.
    * ------------------------------------------------------------------------ */
 
+  /**
+   * `POST /api/hotels/{hotelId}/policies`.
+   *
+   * House rules are written on their own, not with the rest of the hotel:
+   * `edit-hotel` has no policies field at all, and the create form's copy only
+   * covers the moment of creation. The call replaces the whole set, so callers
+   * send every rule they want kept, not just the ones that changed.
+   */
+  async assignPolicies(
+    hotelId: string,
+    policies: Array<{ policyTypeId: number; allowed: boolean }>,
+  ): Promise<void> {
+    await request(`/api/hotels/${hotelId}/policies`, z.unknown(), {
+      method: 'POST',
+      body: { policies },
+    });
+  },
+
+  /**
+   * `POST /api/hotels/{hotelId}/services` — the hotel's paid extras.
+   *
+   * Like policies, this REPLACES the whole set, so callers send everything they
+   * want kept. Writes use `serviceId`; reads come back as `id`.
+   */
+  async assignServices(
+    hotelId: string,
+    services: Array<{ serviceId: number; price: number }>,
+  ): Promise<void> {
+    await request(`/api/hotels/${hotelId}/services`, z.unknown(), {
+      method: 'POST',
+      body: { services },
+    });
+  },
+
+  /** `POST /api/room-types/{roomTypeId}/services` — same, per room type. */
+  async assignRoomServices(
+    roomTypeId: string,
+    services: Array<{ serviceId: number; price: number }>,
+  ): Promise<void> {
+    await request(`/api/room-types/${roomTypeId}/services`, z.unknown(), {
+      method: 'POST',
+      body: { services },
+    });
+  },
+
+  /**
+   * `POST /api/hotels/{hotelId}/children-policy`.
+   *
+   * The server validates hard: bands may not overlap within one `ordinal`,
+   * must sit inside the hotel's own child age range, and `value` must be
+   * absent for Free and As Adult. The wizard checks the same rules first so the
+   * owner sees the problem next to the field rather than as a failed save.
+   */
+  async assignChildrenPolicy(
+    hotelId: string,
+    policy: {
+      childrenAllowed: boolean;
+      minChildAge?: number;
+      maxChildAge?: number;
+      rules: Array<{
+        minAge: number;
+        maxAge: number;
+        ordinal: number;
+        pricingMode: number;
+        value?: number;
+      }>;
+    },
+  ): Promise<void> {
+    await request(`/api/hotels/${hotelId}/children-policy`, z.unknown(), {
+      method: 'POST',
+      body: policy,
+    });
+  },
+
   async editHotel(id: string, form: FormData): Promise<void> {
     await request(`/api/hotels/${id}/edit-hotel`, z.unknown(), { form });
   },

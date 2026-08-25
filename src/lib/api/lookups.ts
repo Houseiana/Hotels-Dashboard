@@ -48,9 +48,13 @@ export const LOOKUP_PATHS = {
   bookingStatus: '/api/HotelManagementLookup/BookingStatus',
   payoutMethod: '/api/HotelManagementLookup/PayoutMethod',
   reviewReplyStatus: '/api/HotelManagementLookup/ReviewReplyStatus',
-  hotelFeeType: '/api/HotelManagementLookup/HotelFeeType',
+  hotelPolicyTypes: '/api/HotelManagementLookup/HotelPolicyTypes',
+  hotelServices: '/api/HotelManagementLookup/HotelServices',
+  roomServices: '/api/HotelManagementLookup/RoomServices',
+  childPricingMode: '/api/HotelManagementLookup/ChildPricingMode',
   reviewSortOption: '/api/HotelManagementLookup/ReviewSortOption',
   amenities: '/api/HotelManagementLookup/Amenities',
+  roomAmenities: '/api/HotelManagementLookup/RoomAmenities',
   countries: '/api/HotelManagementLookup/Countries',
 } as const;
 

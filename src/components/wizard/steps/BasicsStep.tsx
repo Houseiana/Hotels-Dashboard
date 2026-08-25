@@ -18,6 +18,8 @@ import { API_SUPPORTS } from '@/lib/api/capabilities';
 import { CURRENCIES } from '@/lib/catalogs';
 import { useCatalogLabels } from '@/lib/useLabels';
 import { useWizard } from '../WizardProvider';
+import { HouseRulesCard } from './HouseRulesCard';
+import { ChildrenPolicyCard } from './ChildrenPolicyCard';
 import { PanelIntro } from './PanelIntro';
 
 export function BasicsStep() {
@@ -159,6 +161,12 @@ export function BasicsStep() {
           </Grid3>
         </CardBody>
       </Card>
+
+      {/* The server owns this list, so it sits above the free-text policy
+          card that the hotel endpoints cannot store yet. */}
+      <HouseRulesCard />
+
+      <ChildrenPolicyCard />
 
       {/* Policies live here rather than in their own step: they are short, and
           the reference wizard keeps step 1 as the "everything textual" step.

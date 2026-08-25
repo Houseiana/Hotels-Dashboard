@@ -6,6 +6,9 @@ import {
   BOARD_NAMES,
   CANCELLATION_RULES,
   CATEGORY_NAMES,
+  PRICING_MODE_NAMES,
+  PRICING_MODES_WITHOUT_VALUE,
+  looseMatch,
   VIEW_NAMES,
   resolver,
 } from './catalogMap';
@@ -33,6 +36,7 @@ export type SubmitLookups = {
   bedType?: LookupItem[];
   boardBasis?: LookupItem[];
   cancellationPolicyType?: LookupItem[];
+  childPricingMode?: LookupItem[];
   currencies?: Array<{ id: number; code: string }>;
 };
 
@@ -57,6 +61,64 @@ async function toFile(dataUrl: string, name: string): Promise<File | undefined> 
   } catch {
     return undefined;
   }
+}
+
+
+/**
+ * The children policy in the API's own terms.
+ *
+ * Returns undefined when a band's pricing mode is not one the server offers —
+ * dropping the band would silently change the policy, so the caller reports it
+ * instead. `value` is omitted for Free and As Adult, which the API rejects a
+ * value for.
+ */
+export function childrenPolicyPayload(
+  draft: HotelDraft,
+  lookups: SubmitLookups,
+):
+  | {
+      childrenAllowed: boolean;
+      minChildAge?: number;
+      maxChildAge?: number;
+      rules: Array<{
+        minAge: number;
+        maxAge: number;
+        ordinal: number;
+        pricingMode: number;
+        value?: number;
+      }>;
+    }
+  | undefined {
+  const policy = draft.childrenPolicy;
+  const modeId = (slug: string): number | undefined => {
+    const name = PRICING_MODE_NAMES[slug];
+    if (!name) return undefined;
+    return lookups.childPricingMode?.find((item) => looseMatch(item.name) === looseMatch(name))?.id;
+  };
+
+  const rules = policy.rules.flatMap((rule) => {
+    const mode = modeId(rule.pricingMode);
+    if (mode === undefined) return [];
+    const carriesValue = !PRICING_MODES_WITHOUT_VALUE.includes(
+      rule.pricingMode as (typeof PRICING_MODES_WITHOUT_VALUE)[number],
+    );
+    return [
+      {
+        minAge: rule.minAge,
+        maxAge: rule.maxAge,
+        ordinal: rule.ordinal,
+        pricingMode: mode,
+        value: carriesValue ? rule.value : undefined,
+      },
+    ];
+  });
+
+  return {
+    childrenAllowed: policy.childrenAllowed,
+    minChildAge: typeof policy.minChildAge === 'number' ? policy.minChildAge : undefined,
+    maxChildAge: typeof policy.maxChildAge === 'number' ? policy.maxChildAge : undefined,
+    rules,
+  };
 }
 
 export async function draftToCreatePayload(
@@ -88,7 +150,8 @@ export async function draftToCreatePayload(
       if (board === undefined || price === undefined) return [];
 
       // The wizard offers presets; the API wants a policy type plus a window.
-      const preset = plan.refundable ? 'free24h' : 'nonRefundable';
+      // The owner's actual choice, not a guess reconstructed from a boolean.
+      const preset = plan.cancellation || (plan.refundable ? 'free24h' : 'nonRefundable');
       const rule = CANCELLATION_RULES[preset];
 
       return [
@@ -121,6 +184,7 @@ export async function draftToCreatePayload(
         const id = amenityId(slug);
         return id === undefined ? [] : [id];
       }),
+      services: room.services,
       ratePlans,
     };
   });
@@ -152,6 +216,9 @@ export async function draftToCreatePayload(
       return id === undefined ? [] : [id];
     }),
     roomTypes,
+    policies: draft.houseRules,
+    services: draft.services,
+    childrenPolicy: childrenPolicyPayload(draft, lookups),
     cover: coverFile,
     photos: photoFiles,
   };

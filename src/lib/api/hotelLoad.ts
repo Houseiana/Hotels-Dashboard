@@ -8,6 +8,9 @@ import {
   CATEGORY_NAMES,
   VIEW_NAMES,
   reverseResolver,
+  CANCELLATION_RULES,
+  looseMatch,
+  PRICING_MODE_NAMES,
 } from './catalogMap';
 import type { SubmitLookups } from './hotelSubmit';
 import { formatBedConfig, totalBeds, type BedRow } from '../utils';
@@ -35,6 +38,37 @@ function nameToSlug(names: Readonly<Record<string, string>>) {
     if (!value) return undefined;
     return table.get(value.trim().toLowerCase());
   };
+}
+
+/** "PercentageDiscount" and "Percentage Discount" both map to our slug. */
+function pricingSlug(name: string | null | undefined): string | undefined {
+  if (!name) return undefined;
+  const needle = looseMatch(name);
+  return Object.keys(PRICING_MODE_NAMES).find(
+    (slug) => looseMatch(PRICING_MODE_NAMES[slug]) === needle,
+  );
+}
+
+/**
+ * The API stores a policy type plus a window; the wizard offers named presets.
+ * This picks the preset whose rule matches what came back, so an owner who set
+ * "free for 7 days" sees that again rather than the 24-hour default.
+ */
+function cancellationPreset(
+  policyType: string | null | undefined,
+  hours: number | undefined,
+  days: number | undefined,
+): string {
+  const name = (policyType ?? '').trim().toUpperCase();
+  const match = Object.keys(CANCELLATION_RULES).find((slug) => {
+    const rule = CANCELLATION_RULES[slug];
+    if (rule.policyName !== name) return false;
+    if (rule.freeCancellationDays !== undefined) return rule.freeCancellationDays === days;
+    return (rule.freeCancellationHours ?? 0) === (hours ?? 0);
+  });
+  if (match) return match;
+  // An unrecognised combination is still refundable if it has any window.
+  return (hours ?? 0) > 0 || (days ?? 0) > 0 ? 'free24h' : 'nonRefundable';
 }
 
 export function detailToDraft(
@@ -66,11 +100,17 @@ export function detailToDraft(
         (plan.cancellationPolicyType ?? '').trim().toUpperCase() !== 'FIXED' ||
         (nz(plan.freeCancellationHours) ?? 0) > 0 ||
         (nz(plan.freeCancellationDays) ?? 0) > 0;
+      const preset = cancellationPreset(
+        plan.cancellationPolicyType,
+        nz(plan.freeCancellationHours),
+        nz(plan.freeCancellationDays),
+      );
       const board = boardSlug(plan.boardBasis) ?? 'roomOnly';
       return {
         id: plan.id,
         boardBasis: board as RoomTypeDraft['ratePlans'][number]['boardBasis'],
         pricePerNight: price,
+        cancellation: preset,
         // Kept so a save writes the plan back in the currency it was priced
         // in, not whatever the hotel's default happens to be.
         currencyId: nz(plan.currencyId),
@@ -105,6 +145,10 @@ export function detailToDraft(
         return slug ? [slug] : [];
       }),
       photos: room.photos.map((p) => p.url),
+      services: room.services.map((service) => ({
+        serviceId: service.id,
+        price: service.price ?? 0,
+      })),
       ratePlans,
     };
   });
@@ -121,10 +165,13 @@ export function detailToDraft(
     address: str(detail.streetAddress),
     postalCode: str(detail.postalCode),
     area: str(detail.area),
-    // NOTE: the detail response carries cityId/villageId but NOT stateId or
-    // countryId, so the location cascade cannot be pre-selected. The ids are
-    // preserved so an untouched hotel keeps its location on save; picking a
-    // country resets them, which is the correct behaviour anyway.
+    // The response now carries the place NAMES, which is what the guest model
+    // and the edit screen's validation read. It still has no stateId/countryId,
+    // so the location cascade cannot be pre-selected — the ids below keep an
+    // untouched hotel's location intact on save, and picking a country resets
+    // them, which is the right behaviour anyway.
+    city: str(detail.cityName),
+    country: str(detail.countryName),
     cityId: nz(detail.cityId),
     villageId: nz(detail.villageId),
     latitude: nz(detail.latitude),
@@ -142,6 +189,27 @@ export function detailToDraft(
       checkInFrom: detail.checkInTime ?? undefined,
       checkOutUntil: detail.checkOutTime ?? undefined,
     },
+    services: detail.services.map((service) => ({
+      serviceId: service.id,
+      price: service.price ?? 0,
+    })),
+    // `pricingMode` comes back as a NAME; the wizard holds our slug.
+    childrenPolicy: {
+      childrenAllowed: detail.childrenPolicy?.childrenAllowed ?? false,
+      minChildAge: nz(detail.childrenPolicy?.minChildAge) ?? 0,
+      maxChildAge: nz(detail.childrenPolicy?.maxChildAge) ?? 12,
+      rules: (detail.childrenPolicy?.rules ?? []).map((rule) => ({
+        minAge: rule.minAge,
+        maxAge: rule.maxAge,
+        ordinal: rule.ordinal,
+        pricingMode: pricingSlug(rule.pricingMode) ?? 'free',
+        value: nz(rule.value),
+      })),
+    },
+    houseRules: detail.policies.map((policy) => ({
+      policyTypeId: policy.policyTypeId,
+      allowed: policy.allowed,
+    })),
     roomTypes,
   };
 }

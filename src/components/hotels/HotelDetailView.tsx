@@ -26,7 +26,9 @@ import {
 } from '@/components/ui/primitives';
 import { ConfirmDialog } from '@/components/ui/overlay';
 import { GuestPreviewCard } from './GuestPreviewCard';
-import { HotelFeesCard } from './HotelFeesCard';
+import { HotelPoliciesCard } from './HotelPoliciesCard';
+import { HotelServicesCard } from './HotelServicesCard';
+import { HotelChildrenCard } from './HotelChildrenCard';
 import {
   useActivateHotel,
   useDeleteHotelById,
@@ -381,17 +383,19 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
             </CardBody>
           </Card>
 
-          {/* Fees are managed here, not in the wizard: the API gives them their
-              own endpoints on an existing hotel, so each one saves on its own.
-              A deleted hotel is skipped — its `/fees` endpoint answers 404
-              "Hotel not found", the same as its bookings. */}
-          {!hotel.isDeleted ? (
-          <HotelFeesCard
-            hotelId={hotelId}
-            currency={currency}
-            roomTypes={draft.roomTypes.map((room) => ({ id: room.id, name: room.name }))}
-          />
-          ) : null}
+          {/* The optional-extras card used to sit here. The backend withdrew
+              the whole fees feature — `/api/hotels/{id}/fees`, its edit and
+              delete routes, and the HotelFeeType lookup are all gone from the
+              spec and answer 404 — so rendering it only produced failed
+              requests. `src/lib/api/fees.ts` still holds the client if the
+              endpoints come back. */}
+
+          <HotelServicesCard services={hotel.services} currency={currency} />
+
+          {/* House rules come back with the hotel itself, so no extra call. */}
+          <HotelPoliciesCard policies={hotel.policies} />
+
+          <HotelChildrenCard policy={hotel.childrenPolicy} currency={currency} />
         </div>
 
         <div className="flex flex-col gap-4 lg:sticky lg:top-5 lg:self-start">

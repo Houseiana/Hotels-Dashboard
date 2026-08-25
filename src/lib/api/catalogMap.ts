@@ -50,46 +50,52 @@ export const BOARD_NAMES: SlugTable = {
   fullBoard: 'Full Board',
 };
 
+/**
+ * `GET /api/HotelManagementLookup/Amenities` — what the HOTEL offers.
+ *
+ * The backend replaced the old 39-item short-let list (Swing, Pool Table,
+ * Ski-in/Ski-out) with these 17 after we flagged that a hotel could not say it
+ * had a restaurant. Room-level amenities are a separate lookup now; see
+ * ROOM_AMENITY_NAMES.
+ */
 export const AMENITY_NAMES: SlugTable = {
-  wifi: 'WiFi',
-  kitchen: 'Kitchen',
-  washer: 'Washer',
-  dryer: 'Dryer',
-  airConditioning: 'Air Conditioning',
-  heating: 'Heating',
-  workspace: 'Workspace',
-  tv: 'TV',
-  freeParking: 'Free Parking',
-  pool: 'Pool',
-  gym: 'Gym',
-  hotTub: 'Hot Tub',
-  security: 'Security',
-  bbqGrill: 'BBQ Grill',
-  jacuzzi: 'Jacuzzi',
-  privateGarden: 'Private Garden',
-  rooftop: 'RoofTop',
-  swing: 'Swing',
-  iron: 'Iron',
-  hairDryer: 'Hair Dryer',
-  coffeeMaker: 'Coffee Maker',
-  microwave: 'Microwave',
-  dishwasher: 'Dishwasher',
+  swimmingPool: 'Swimming Pool',
+  gym: 'Gym / Fitness Center',
+  spa: 'Spa & Wellness Center',
+  restaurant: 'Restaurant',
+  cafe: 'Café / Coffee Shop',
+  freeWifi: 'Free WiFi',
+  parking: 'Parking',
   elevator: 'Elevator',
-  balcony: 'Balcony',
-  fireplace: 'Fireplace',
-  securitySystem: 'Security System',
-  firePit: 'Fire Pit',
-  poolTable: 'Pool Table',
-  piano: 'Piano',
-  exerciseEquipment: 'Exercise Equipment',
-  lakeAccess: 'Lake Access',
+  businessCenter: 'Business Center',
+  meetingRooms: 'Meeting & Event Rooms',
+  kidsPlayArea: "Kids' Play Area",
+  prayerRoom: 'Prayer Room',
+  gardenTerrace: 'Garden / Terrace',
   beachAccess: 'Beach Access',
-  skiInSkiOut: 'Ski-in/Ski-out',
-  outdoorShower: 'Outdoor Shower',
-  smokeAlarm: 'Smoke Alarm',
-  firstAidKit: 'First Aid Kit',
-  fireExtinguisher: 'Fire Extinguisher',
-  carbonMonoxideAlarm: 'Carbon Monoxide Alarm',
+  wheelchairAccessible: 'Wheelchair Accessible',
+  barLounge: 'Bar / Lounge',
+  banquetHall: 'Banquet / Events Hall',
+};
+
+/** `GET /api/HotelManagementLookup/RoomAmenities` — what one ROOM has. */
+export const ROOM_AMENITY_NAMES: SlugTable = {
+  roomAirConditioning: 'Air Conditioning',
+  roomTv: 'TV',
+  roomMinibar: 'Minibar',
+  roomSafe: 'In-Room Safe',
+  roomHairDryer: 'Hair Dryer',
+  roomIron: 'Iron & Ironing Board',
+  roomCoffeeMaker: 'Coffee / Tea Maker',
+  roomRefrigerator: 'Refrigerator',
+  roomMicrowave: 'Microwave',
+  roomBalcony: 'Balcony',
+  roomBathtub: 'Bathtub',
+  roomWorkspace: 'Desk / Workspace',
+  roomWardrobe: 'Wardrobe / Closet',
+  roomBlackoutCurtains: 'Blackout Curtains',
+  roomKitchenette: 'Kitchenette',
+  roomSeatingArea: 'Sofa / Seating Area',
 };
 
 /**
@@ -112,6 +118,9 @@ export const CANCELLATION_RULES: Readonly<
 /* -- resolution ------------------------------------------------------------ */
 
 const normalise = (value: string) => value.trim().toLowerCase();
+
+/** Ignores spacing too: the API writes "Fixed Amount" but reads "FixedAmount". */
+export const looseMatch = (value: string) => value.trim().toLowerCase().replace(/[\s_-]+/g, '');
 
 /**
  * A server entry the dashboard has no slug for is carried as "#<id>".
@@ -172,6 +181,81 @@ export function reverseResolver(
  * Optional extras a hotel charges for. "Other" is the escape hatch: pair it
  * with `customName`/`customNameAr` to name a fee this list does not cover.
  */
+/**
+ * `GET /api/HotelManagementLookup/HotelPolicyTypes`.
+ *
+ * The hotel's house rules. The server owns the list — this table only maps its
+ * names onto slugs we have Arabic for; an entry it adds still renders, in the
+ * server's own words.
+ */
+export const POLICY_TYPE_NAMES: Readonly<Record<string, string>> = {
+  petsAllowed: 'Pets Allowed',
+  idRequired: 'ID Required at Check-in',
+  partiesAllowed: 'Parties / Events Allowed',
+  visitorsAllowed: 'Visitors Allowed',
+  marriedCouplesOnly: 'Married Couples Only',
+};
+
+/**
+ * `GET /api/HotelManagementLookup/HotelServices` — extras the HOTEL sells.
+ *
+ * This is what the withdrawn "fees" feature became, and it is a better fit: a
+ * service is something a guest pays for on top of the room, which is a
+ * different question from whether the hotel HAS the thing (that is an amenity).
+ */
+/**
+ * `GET /api/HotelManagementLookup/ChildPricingMode` — how a child is charged.
+ *
+ * The lookup spells these with spaces ("Fixed Amount") but the hotel record
+ * reads them back compacted ("FixedAmount"), so matching ignores spacing —
+ * see `normalise` below.
+ */
+export const PRICING_MODE_NAMES: SlugTable = {
+  free: 'Free',
+  fixedAmount: 'Fixed Amount',
+  percentageDiscount: 'Percentage Discount',
+  asAdult: 'As Adult',
+};
+
+/** The two modes the API rejects a `value` for. */
+export const PRICING_MODES_WITHOUT_VALUE = ['free', 'asAdult'] as const;
+
+export const HOTEL_SERVICE_NAMES: SlugTable = {
+  airportTransfer: 'Airport Transfer',
+  shuttleService: 'Shuttle Service',
+  chauffeur: 'Chauffeur / Private Driver',
+  valetParking: 'Valet Parking',
+  concierge: 'Concierge',
+  frontDesk24h: '24-Hour Front Desk',
+  luggageStorage: 'Luggage Storage',
+  dailyHousekeeping: 'Daily Housekeeping',
+  laundry: 'Laundry & Dry Cleaning',
+  ironing: 'Ironing Service',
+  roomService: 'In-Room Dining (Room Service)',
+  earlyCheckIn: 'Early Check-in',
+  lateCheckOut: 'Late Check-out',
+  babysitting: 'Babysitting / Childcare',
+  carRental: 'Car Rental Desk',
+  tourDesk: 'Tour & Excursion Desk',
+  currencyExchange: 'Currency Exchange',
+  safeDeposit: 'Safe Deposit at Reception',
+  spaMassage: 'Spa Treatments & Massage',
+  wakeUpCall: 'Wake-up Call',
+  doctorOnCall: 'Doctor on Call',
+};
+
+/** `GET /api/HotelManagementLookup/RoomServices` — extras sold per ROOM. */
+export const ROOM_SERVICE_NAMES: SlugTable = {
+  extraBed: 'Extra Bed',
+  babyCot: 'Baby Cot / Crib',
+  turndown: 'Turndown Service',
+  butler: 'Butler Service',
+  minibarRestock: 'Minibar Restocking',
+  welcomeAmenities: 'Welcome Amenities',
+  pillowMenu: 'Pillow Menu',
+};
+
+/** WITHDRAWN with the fees endpoints on 2026-08-24; kept for reference. */
 export const FEE_TYPE_NAMES: Readonly<Record<string, string>> = {
   spa: 'Spa',
   laundry: 'Laundry',

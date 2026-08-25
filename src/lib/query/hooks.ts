@@ -149,19 +149,6 @@ export function useHotelDetail(id: string | undefined): UseQueryResult<HotelDeta
   });
 }
 
-/** Companion to `useHotelDetail` — see `hotelsApi.placeNamesFor` for why. */
-export function useHotelPlaceNames(
-  id: string | undefined,
-  managerId: string | undefined,
-  name: string | undefined,
-): UseQueryResult<{ cityName: string | null; countryName: string | null } | null> {
-  return useQuery({
-    queryKey: [...queryKeys.hotels.detail(id ?? ''), 'places', name ?? ''],
-    queryFn: () => hotelsApi.placeNamesFor(id as string, managerId, name as string),
-    enabled: Boolean(id && name),
-  });
-}
-
 export function useHotel(id: string | undefined): UseQueryResult<Hotel> {
   return useQuery({
     queryKey: queryKeys.hotels.detail(id ?? ''),

@@ -29,7 +29,8 @@ import type { HotelDetail } from '@/lib/schemas/hotelApi';
 import { queryKeys } from '@/lib/query/keys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/components/providers/SessionProvider';
-import { draftToCreateForm } from '@/lib/api/hotelSubmit';
+import { childrenPolicyPayload, draftToCreateForm } from '@/lib/api/hotelSubmit';
+import { hotelsApi } from '@/lib/api/hotels';
 import { clearDraft, loadDraft, saveDraft, NEW_DRAFT_KEY } from '@/lib/wizard/draftStore';
 import { makeId } from '@/lib/utils';
 import { BOARD_INCLUDES_BREAKFAST, DEFAULT_CURRENCY } from '@/lib/catalogs';
@@ -102,6 +103,7 @@ function newRoom(): RoomTypeDraft {
     pricePerNight: undefined,
     amenities: [],
     photos: [],
+    services: [],
     ratePlans: [newRatePlan()],
   };
 }
@@ -111,6 +113,7 @@ function newRatePlan(): RatePlanDraft {
     id: makeId('rp'),
     boardBasis: 'roomOnly',
     pricePerNight: undefined,
+    cancellation: 'free24h',
     refundable: true,
     breakfastIncluded: false,
   };
@@ -142,6 +145,7 @@ export function WizardProvider({
   const bedType = useLookup('bedType');
   const boardBasis = useLookup('boardBasis');
   const cancellationPolicyType = useLookup('cancellationPolicyType');
+  const childPricingMode = useLookup('childPricingMode');
   const currencies = useCurrencyLookup();
 
   const lookups = useMemo(
@@ -152,6 +156,7 @@ export function WizardProvider({
       bedType: bedType.data,
       boardBasis: boardBasis.data,
       cancellationPolicyType: cancellationPolicyType.data,
+      childPricingMode: childPricingMode.data,
       currencies: currencies.data,
     }),
     [
@@ -161,6 +166,7 @@ export function WizardProvider({
       bedType.data,
       boardBasis.data,
       cancellationPolicyType.data,
+      childPricingMode.data,
       currencies.data,
     ],
   );
@@ -361,6 +367,36 @@ export function WizardProvider({
       managerId,
       name: latest.current.name,
     });
+    // The create form already carries the house rules, so this is a
+    // confirmation rather than the only chance to save them — which matters,
+    // because `id` is null whenever the follow-up lookup could not identify
+    // the new hotel.
+    if (id && latest.current.services.length > 0) {
+      try {
+        await hotelsApi.assignServices(id, latest.current.services);
+      } catch {
+        // Already sent with the create; not worth failing the publish over.
+      }
+    }
+
+    if (id && latest.current.houseRules.length > 0) {
+      try {
+        await hotelsApi.assignPolicies(id, latest.current.houseRules);
+      } catch {
+        // The rules went out with the create; a failure here is not worth
+        // failing the whole publish over.
+      }
+    }
+
+    if (id && latest.current.childrenPolicy.childrenAllowed) {
+      try {
+        const payload = childrenPolicyPayload(latest.current, lookups);
+        if (payload) await hotelsApi.assignChildrenPolicy(id, payload);
+      } catch {
+        // Already sent with the create; not worth failing the publish over.
+      }
+    }
+
     // Only drop the local draft once the server has definitely taken it.
     clearDraft(draftKey);
     return id;
