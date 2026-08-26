@@ -7,6 +7,7 @@ import {
   BOARD_NAMES,
   CANCELLATION_RULES,
   CATEGORY_NAMES,
+  ROOM_AMENITY_NAMES,
   VIEW_NAMES,
   resolver,
 } from './catalogMap';
@@ -19,7 +20,7 @@ import {
   type RatePlanPayload,
 } from './hotelForms';
 import { hotelsApi } from './hotels';
-import { childrenPolicyPayload, type SubmitLookups } from './hotelSubmit';
+import { childrenPolicyPayload, pricedServices, type SubmitLookups } from './hotelSubmit';
 import { parseBedConfig } from '../utils';
 
 /* ---------------------------------------------------------------------------
@@ -149,9 +150,14 @@ function roomSignature(room: RoomTypeDraft): string {
   });
 }
 
-function planSignature(plan: RoomTypeDraft['ratePlans'][number]): string {
+/** `currencyId` is passed in: it can change without the plan itself changing. */
+function planSignature(
+  plan: RoomTypeDraft['ratePlans'][number],
+  currencyId: number | undefined,
+): string {
   return JSON.stringify({
     board: plan.boardBasis,
+    currencyId,
     price: num(plan.pricePerNight),
     cancellation: plan.cancellation,
     refundable: plan.refundable,
@@ -170,13 +176,14 @@ export async function applyHotelEdit(
   const incompletePlans: string[] = [];
 
   const amenityId = resolver(lookups.amenities, AMENITY_NAMES);
+  const roomAmenityId = resolver(lookups.roomAmenities, ROOM_AMENITY_NAMES);
   const categoryId = resolver(lookups.roomCategory, CATEGORY_NAMES);
   const viewId = resolver(lookups.viewType, VIEW_NAMES);
   const bedId = resolver(lookups.bedType, BED_NAMES);
   const boardId = resolver(lookups.boardBasis, BOARD_NAMES);
-  // Only used for plans that have no currency of their own (a plan the owner
-  // just added). An existing plan keeps the currency it was loaded with.
   const draftCurrencyId = lookups.currencies?.find((c) => c.code === draft.currency)?.id;
+  /** Set once `original` is known, below; read by `planBody`. */
+  let currencyChanged = false;
 
   /** The API reads bed and board back as names; map a name to its id. */
   const idByName = (items: LookupItem[] | undefined) => {
@@ -199,9 +206,17 @@ export async function applyHotelEdit(
     )?.id;
   };
 
+  /** The hotel's own amenities. */
   const slugAmenityIds = (slugs: string[]): number[] =>
     slugs.flatMap((slug) => {
       const id = amenityId(slug);
+      return id === undefined ? [] : [id];
+    });
+
+  /** A room's amenities — a different lookup, see SubmitLookups.roomAmenities. */
+  const slugRoomAmenityIds = (slugs: string[]): number[] =>
+    slugs.flatMap((slug) => {
+      const id = roomAmenityId(slug);
       return id === undefined ? [] : [id];
     });
 
@@ -214,7 +229,10 @@ export async function applyHotelEdit(
     return {
       boardBasis: board,
       basePrice: price,
-      currencyId: plan.currencyId ?? draftCurrencyId,
+      // A plan keeps the currency it was priced in, UNLESS the owner changed
+      // the hotel currency on the Basics step — that field used to be editable
+      // and have no effect at all on an existing hotel.
+      currencyId: currencyChanged ? draftCurrencyId : (plan.currencyId ?? draftCurrencyId),
       cancellationPolicyType: policyId(preset),
       freeCancellationHours: rule?.freeCancellationHours,
       freeCancellationDays: rule?.freeCancellationDays,
@@ -239,6 +257,9 @@ export async function applyHotelEdit(
   };
 
   const original = detailToDraft(detail, lookups, fallbackCurrency);
+  // `original.currency` is read back off the plans, so this is a real change of
+  // mind rather than the account default differing from what the hotel sells in.
+  currencyChanged = Boolean(draftCurrencyId) && draft.currency !== original.currency;
   const originalRooms = new Map(detail.roomTypes.map((room) => [room.id, room]));
   const originalDraftRooms = new Map(original.roomTypes.map((room) => [room.id, room]));
 
@@ -298,12 +319,12 @@ export async function applyHotelEdit(
    * it only runs when the set differs.
    * ------------------------------------------------------------------------ */
 
-  const serviceKey = (services: Array<{ serviceId: number; price: number }>) =>
+  const serviceKey = (services: ReadonlyArray<{ serviceId: number; price?: number }>) =>
     JSON.stringify([...services].sort((a, b) => a.serviceId - b.serviceId));
 
   if (serviceKey(draft.services) !== serviceKey(original.services)) {
     await run('services', draft.name.trim() || detail.name, () =>
-      hotelsApi.assignServices(detail.id, draft.services),
+      hotelsApi.assignServices(detail.id, pricedServices(draft.services)),
     );
   }
 
@@ -324,10 +345,13 @@ export async function applyHotelEdit(
 
   if (childKey(draft.childrenPolicy) !== childKey(original.childrenPolicy)) {
     const payload = childrenPolicyPayload(draft, lookups);
+    const who = draft.name.trim() || detail.name;
     if (payload) {
-      await run('childrenPolicy', draft.name.trim() || detail.name, () =>
-        hotelsApi.assignChildrenPolicy(detail.id, payload),
-      );
+      await run('childrenPolicy', who, () => hotelsApi.assignChildrenPolicy(detail.id, payload));
+    } else {
+      // A band whose pricing mode we cannot express: sending the rest would
+      // delete it server-side, so nothing is sent and the owner is told.
+      steps.push({ kind: 'childrenPolicy', subject: who, ok: false, error: 'childModeUnknown' });
     }
   }
 
@@ -365,7 +389,10 @@ export async function applyHotelEdit(
               const type = bedId(bed.type);
               return type === undefined ? [] : [{ bedType: type, count: bed.qty }];
             }),
-            amenityIds: slugAmenityIds(room.amenities),
+            amenityIds: slugRoomAmenityIds(room.amenities),
+            // Sent with the create: the assign-services call below is keyed by
+            // room-type id, which this room will not have until it exists.
+            services: pricedServices(room.services),
             ratePlans: room.ratePlans.flatMap((plan) => {
               const body = planBody(plan);
               if (!body) {
@@ -391,7 +418,7 @@ export async function applyHotelEdit(
     // written for a room the server already has.
     if (serviceKey(room.services) !== serviceKey(beforeDraft?.services ?? [])) {
       await run('roomServices', room.name, () =>
-        hotelsApi.assignRoomServices(room.id, room.services),
+        hotelsApi.assignRoomServices(room.id, pricedServices(room.services)),
       );
     }
 
@@ -447,7 +474,7 @@ export async function applyHotelEdit(
           totalUnits: num(room.inventory) ?? 1,
           beds,
           bedIdsToRemove,
-          amenityIds: slugAmenityIds(room.amenities),
+          amenityIds: slugRoomAmenityIds(room.amenities),
           coverPhoto: roomPhotos.coverPhoto,
           newPhotos: roomPhotos.added,
           photoIdsToRemove: roomPhotos.removedIds,
@@ -492,7 +519,12 @@ export async function applyHotelEdit(
       }
 
       const wasDraft = beforeDraftPlans.get(plan.id);
-      if (wasDraft && planSignature(plan) === planSignature(wasDraft)) continue;
+      if (
+        wasDraft &&
+        planSignature(plan, body.currencyId) ===
+          planSignature(wasDraft, wasDraft.currencyId ?? draftCurrencyId)
+      )
+        continue;
 
       // The board a plan sells cannot be updated, so a board change is a
       // different plan: drop this one and create its replacement.

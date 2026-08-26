@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Plus, Trash2 } from 'lucide-react';
-import { Button, Card, CardBody, CardHeader, Chip, Skeleton } from '@/components/ui/primitives';
+import { Button, Card, CardBody, CardHeader, Chip } from '@/components/ui/primitives';
 import { Field, Grid2, Grid3, NumberInput, Select, Toggle } from '@/components/ui/form';
 import { Modal } from '@/components/ui/overlay';
 import { useLookup } from '@/lib/query/lookups';
@@ -42,8 +42,14 @@ function bandProblem(
   if (band.minAge < minChildAge || band.maxAge > maxChildAge) return 'childAgeOutside';
   if (band.ordinal < 1) return 'childOrdinalMin';
   if (carriesValue(band.pricingMode)) {
-    if (typeof band.value !== 'number' || band.value <= 0) return 'childValueRequired';
-    if (band.pricingMode === 'percentageDiscount' && band.value > 100) return 'childPercentRange';
+    if (typeof band.value !== 'number') return 'childValueRequired';
+    // A 0% discount is a legal percentage — the server only requires a fixed
+    // amount to be positive.
+    if (band.pricingMode === 'percentageDiscount') {
+      if (band.value < 0 || band.value > 100) return 'childPercentRange';
+    } else if (band.value <= 0) {
+      return 'childValueRequired';
+    }
   }
   // Bands may share an age range only when they price a DIFFERENT child.
   const clash = existing.some(
@@ -96,8 +102,34 @@ export function ChildrenPolicyCard() {
 
   const problem = bandProblem(band, policy.rules, minAge, maxAge);
 
+  /**
+   * The bands already entered, re-checked against the CURRENT age range.
+   *
+   * `bandProblem` only ever ran on the band being added, so lowering the
+   * maximum age after the fact left bands outside it and nothing said so until
+   * the server rejected the whole policy with one message.
+   */
+  const settledProblem = policy.rules
+    .map((rule, index) =>
+      bandProblem(
+        rule,
+        policy.rules.filter((_, i) => i !== index),
+        minAge,
+        maxAge,
+      ),
+    )
+    .find(Boolean);
+
+  const rangeProblem = minAge > maxAge ? 'childAgeOrder' : settledProblem;
+
   const openDialog = () => {
-    setBand({ minAge, maxAge, ordinal: 1, pricingMode: modeSlugs[0] ?? 'free' });
+    // Start after the last band rather than across the whole range, which
+    // opened the dialog already showing an overlap it caused itself.
+    const firstChild = policy.rules.filter((rule) => rule.ordinal === 1);
+    const from = firstChild.length
+      ? Math.min(maxAge, Math.max(...firstChild.map((rule) => rule.maxAge)) + 1)
+      : minAge;
+    setBand({ minAge: from, maxAge, ordinal: 1, pricingMode: modeSlugs[0] ?? 'free' });
     setAdding(true);
   };
 
@@ -167,15 +199,19 @@ export function ChildrenPolicyCard() {
               </Field>
             </Grid2>
 
-            {modes.isPending ? (
-              <Skeleton className="h-16" />
-            ) : policy.rules.length === 0 ? (
+            {rangeProblem ? (
+              <p className="text-[12px] font-medium text-warn">{t(rangeProblem)}</p>
+            ) : null}
+
+            {/* The bands are the owner's own data — only the mode PICKER waits
+                on the lookup, so the list is not hidden behind a skeleton. */}
+            {policy.rules.length === 0 ? (
               <p className="text-[13px] text-muted">{t('childrenNoBands')}</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {policy.rules.map((rule, index) => (
                   <div
-                    key={`${rule.ordinal}-${rule.minAge}-${rule.maxAge}`}
+                    key={`${index}-${rule.ordinal}-${rule.minAge}-${rule.maxAge}`}
                     className="flex flex-wrap items-center gap-3 rounded-[var(--radius-ctl)] border border-line px-3.5 py-2.5"
                   >
                     <Chip tone="neutral" className="px-2 py-0 text-[11px]">

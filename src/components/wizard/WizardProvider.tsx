@@ -13,6 +13,7 @@ import {
 import {
   draftToHotel,
   emptyDraft,
+  servicesPriced,
   STEP_SCHEMAS,
   WIZARD_STEPS,
   type HotelDraft,
@@ -29,7 +30,7 @@ import type { HotelDetail } from '@/lib/schemas/hotelApi';
 import { queryKeys } from '@/lib/query/keys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/components/providers/SessionProvider';
-import { childrenPolicyPayload, draftToCreateForm } from '@/lib/api/hotelSubmit';
+import { childrenPolicyPayload, draftToCreateForm, pricedServices } from '@/lib/api/hotelSubmit';
 import { hotelsApi } from '@/lib/api/hotels';
 import { clearDraft, loadDraft, saveDraft, NEW_DRAFT_KEY } from '@/lib/wizard/draftStore';
 import { makeId } from '@/lib/utils';
@@ -74,6 +75,8 @@ type WizardContextValue = {
    * this wizard is creating rather than editing.
    */
   saveEdit: (() => Promise<EditResult>) | null;
+  /** Every server vocabulary has landed, so a save can resolve every slug. */
+  lookupsReady: boolean;
   /** This wizard opened from a local draft, not from the server's copy. */
   hasLocalDraft: boolean;
   /** Throws the local draft away and reloads the server's version. */
@@ -140,6 +143,7 @@ export function WizardProvider({
 
   /* Every server vocabulary the submit mapper needs to turn slugs into ids. */
   const amenities = useLookup('amenities');
+  const roomAmenities = useLookup('roomAmenities');
   const roomCategory = useLookup('roomCategory');
   const viewType = useLookup('viewType');
   const bedType = useLookup('bedType');
@@ -151,6 +155,7 @@ export function WizardProvider({
   const lookups = useMemo(
     () => ({
       amenities: amenities.data,
+      roomAmenities: roomAmenities.data,
       roomCategory: roomCategory.data,
       viewType: viewType.data,
       bedType: bedType.data,
@@ -161,6 +166,7 @@ export function WizardProvider({
     }),
     [
       amenities.data,
+      roomAmenities.data,
       roomCategory.data,
       viewType.data,
       bedType.data,
@@ -170,6 +176,25 @@ export function WizardProvider({
       currencies.data,
     ],
   );
+
+  /**
+   * Every vocabulary the diff resolves slugs through. Saving before these load
+   * would resolve each one to `undefined` and send an edit that strips the
+   * hotel's category, view and amenities — so saving waits for them.
+   */
+  const lookupsReady =
+    Boolean(lookups.amenities?.length) &&
+    Boolean(lookups.roomCategory?.length) &&
+    Boolean(lookups.viewType?.length) &&
+    Boolean(lookups.bedType?.length) &&
+    Boolean(lookups.boardBasis?.length) &&
+    Boolean(lookups.cancellationPolicyType?.length) &&
+    Boolean(lookups.roomAmenities?.length) &&
+    // Both were missing from this gate, and both are needed to save without
+    // loss: an unresolved pricing mode would blank the children policy, and a
+    // missing currency list would price a new rate plan in nothing at all.
+    Boolean(lookups.childPricingMode?.length) &&
+    Boolean(lookups.currencies?.length);
 
   /** Which local-storage slot this wizard owns. */
   const draftKey = initialDraft?.id ?? NEW_DRAFT_KEY;
@@ -281,7 +306,11 @@ export function WizardProvider({
               // Board basis is the single input; breakfastIncluded is derived
               // from it so the two can never disagree in the shared model.
               if (patch.boardBasis) {
-                next.breakfastIncluded = BOARD_INCLUDES_BREAKFAST[patch.boardBasis];
+                // A board the server offers but we have no slug for ("#<id>")
+                // is not in the table; anything other than room-only feeds the
+                // guest, so default to true rather than to undefined.
+                const known: Record<string, boolean> = BOARD_INCLUDES_BREAKFAST;
+                next.breakfastIncluded = known[patch.boardBasis] ?? true;
               }
               return next;
             }),
@@ -316,7 +345,11 @@ export function WizardProvider({
   // Step 6 runs the real shared-model schema — the exact gate the guest app uses.
   const publishIssues = useMemo(() => {
     const result = hotelSchema.safeParse({ ...draftToHotel(draft), status: 'active' });
-    return result.success ? [] : collectIssues(result.error);
+    const issues = result.success ? [] : collectIssues(result.error);
+    // Services live outside the shared model, so their prices are checked
+    // separately — a row with an empty price must not be saveable.
+    const priced = servicesPriced.safeParse(draft);
+    return priced.success ? issues : [...issues, ...collectIssues(priced.error)];
   }, [draft]);
 
   const issuesFor = useCallback(
@@ -361,6 +394,10 @@ export function WizardProvider({
    */
   const submit = useCallback(async (): Promise<string | null> => {
     if (timer.current) clearTimeout(timer.current);
+    // Same gate the edit path has. Creating before the vocabularies land was
+    // silently accepted by the server and produced a hotel with no category,
+    // no view, no amenities and no beds — every optional field dropped.
+    if (!lookupsReady) throw new Error('lookupsNotReady');
     const form = await draftToCreateForm(latest.current, managerId, lookups);
     const id = await createHotel.mutateAsync({
       form,
@@ -373,7 +410,7 @@ export function WizardProvider({
     // the new hotel.
     if (id && latest.current.services.length > 0) {
       try {
-        await hotelsApi.assignServices(id, latest.current.services);
+        await hotelsApi.assignServices(id, pricedServices(latest.current.services));
       } catch {
         // Already sent with the create; not worth failing the publish over.
       }
@@ -400,20 +437,8 @@ export function WizardProvider({
     // Only drop the local draft once the server has definitely taken it.
     clearDraft(draftKey);
     return id;
-  }, [createHotel, draftKey, managerId, lookups]);
+  }, [createHotel, draftKey, managerId, lookups, lookupsReady]);
 
-  /**
-   * Every vocabulary the diff resolves slugs through. Saving before these load
-   * would resolve each one to `undefined` and send an edit that strips the
-   * hotel's category, view and amenities — so saving waits for them.
-   */
-  const lookupsReady =
-    Boolean(lookups.amenities?.length) &&
-    Boolean(lookups.roomCategory?.length) &&
-    Boolean(lookups.viewType?.length) &&
-    Boolean(lookups.bedType?.length) &&
-    Boolean(lookups.boardBasis?.length) &&
-    Boolean(lookups.cancellationPolicyType?.length);
 
   const [isEditing, setIsEditing] = useState(false);
 
@@ -470,6 +495,7 @@ export function WizardProvider({
       saveDraftNow,
       submit,
       saveEdit: initialDetail && lookupsReady ? saveEdit : null,
+      lookupsReady,
       hasLocalDraft,
       discardLocalDraft,
       isSaving: createHotel.isPending || isEditing,

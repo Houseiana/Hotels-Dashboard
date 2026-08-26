@@ -77,6 +77,12 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
 
   const detail = useHotelDetail(hotelId);
   const amenities = useLookup('amenities');
+  // The same full bundle the wizard loads with — a partial one reads a room's
+  // amenities, board, category and view back as empty or as the default.
+  const roomAmenities = useLookup('roomAmenities');
+  const roomCategory = useLookup('roomCategory');
+  const viewType = useLookup('viewType');
+  const boardBasis = useLookup('boardBasis');
   const bedType = useLookup('bedType');
   const currencies = useCurrencyLookup();
 
@@ -90,10 +96,27 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
     if (!detail.data) return undefined;
     return detailToDraft(
       detail.data,
-      { amenities: amenities.data, bedType: bedType.data, currencies: currencies.data },
+      {
+        amenities: amenities.data,
+        roomAmenities: roomAmenities.data,
+        roomCategory: roomCategory.data,
+        viewType: viewType.data,
+        boardBasis: boardBasis.data,
+        bedType: bedType.data,
+        currencies: currencies.data,
+      },
       DEFAULT_CURRENCY,
     );
-  }, [detail.data, amenities.data, bedType.data, currencies.data]);
+  }, [
+    detail.data,
+    amenities.data,
+    roomAmenities.data,
+    roomCategory.data,
+    viewType.data,
+    boardBasis.data,
+    bedType.data,
+    currencies.data,
+  ]);
 
   if (detail.isPending) {
     return (

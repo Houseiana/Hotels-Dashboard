@@ -357,12 +357,14 @@
       "groupOther": "أخرى",
       "cardServices": "خدمات بمقابل",
       "servicesHint": "خدمات الضيف بيدفع مقابلها فوق سعر الغرفة.",
+      "servicesEmpty": "السيرفر لسه مافيهوش خدمات، فمفيش حاجة تتسعّر هنا.",
       "servicesNoneYet": "مفيش خدمات مضافة.",
       "servicesAllAdded": "كل الخدمات المتاحة اتضافت.",
       "addService": "إضافة خدمة",
       "removeService": "حذف الخدمة",
       "serviceName": "الخدمة",
       "servicePrice": "السعر",
+      "servicePriceRequired": "حدّد السعر",
       "roomServicesTitle": "خدمات الغرفة",
       "roomServicesHint": "خدمات بتتباع مع نوع الغرفة ده."
     },
@@ -435,6 +437,7 @@
       "removeService": "حذف الخدمة",
       "serviceName": "الخدمة",
       "servicePrice": "السعر",
+      "servicePriceRequired": "حدّد السعر",
       "servicesNoneYet": "مفيش خدمات مضافة.",
       "servicesAllAdded": "كل الخدمات المتاحة اتضافت.",
       "sectionIdentity": "الغرفة دي إيه",
@@ -479,6 +482,7 @@
     "warning": {
       "coverPhotoNeedsUpload": "صورة الغلاف فضلت زي ما هي — الـ API بيقبل غلاف من ملف مرفوع جديد بس، مش من صورة محفوظة عنده قبل كدا."
     },
+    "childModeUnknown": "فيه فئة عمرية للأطفال بتستخدم طريقة تسعير السيرفر مابقاش بيوفرها، فسياسة الأطفال اتسابت زي ما هي.",
     "ratePlanIncomplete": "خطة الأسعار دي لسه من غير سعر، فماتحفظتش.",
     "localDraftNote": "اللي قدامك مسودة محفوظة في المتصفح ده، مش النسخة اللي على السيرفر. لو الفندق اتعدّل من مكان تاني بعد كده، الحفظ هيكتب نسختك فوقه.",
     "localDraftDiscard": "امسح المسودة وحمّل نسخة السيرفر"
@@ -698,6 +702,8 @@
     "priceRequired": "أدخل سعر الليلة.",
     "pricePositive": "السعر يجب أن يكون أكبر من ٠.",
     "discountRange": "الخصم يجب أن يكون بين ٠ و١٠٠.",
+    "boardRequired": "اختار نظام الإقامة لخطة السعر دي.",
+    "servicePriceRequired": "كل خدمة مدفوعة لازم يكون ليها سعر أكبر من صفر.",
     "ratePlanRequired": "أضف خطة سعر واحدة على الأقل.",
     "integerRequired": "أدخل رقمًا صحيحًا.",
     "timeFormat": "استخدم صيغة ٢٤ ساعة مثل 15:00.",

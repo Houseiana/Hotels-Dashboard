@@ -54,6 +54,13 @@ export function WizardPage({ hotelId }: { hotelId?: string }) {
   // Turning the API's record back into a draft needs the same vocabularies the
   // submit direction uses — the API answers in display names, not slugs.
   const amenities = useLookup('amenities');
+  // Rooms have their own amenity vocabulary, and board/category/view are read
+  // back as names that only these lists can turn into a value we can write.
+  // Passing a partial bundle here silently emptied every one of those fields.
+  const roomAmenities = useLookup('roomAmenities');
+  const roomCategory = useLookup('roomCategory');
+  const viewType = useLookup('viewType');
+  const boardBasis = useLookup('boardBasis');
   const bedType = useLookup('bedType');
   const currencies = useCurrencyLookup();
 
@@ -70,10 +77,28 @@ export function WizardPage({ hotelId }: { hotelId?: string }) {
     // lookup this used to need is gone.
     return detailToDraft(
       detail.data,
-      { amenities: amenities.data, bedType: bedType.data, currencies: currencies.data },
+      {
+        amenities: amenities.data,
+        roomAmenities: roomAmenities.data,
+        roomCategory: roomCategory.data,
+        viewType: viewType.data,
+        boardBasis: boardBasis.data,
+        bedType: bedType.data,
+        currencies: currencies.data,
+      },
       currency,
     );
-  }, [detail.data, amenities.data, bedType.data, currencies.data, currency]);
+  }, [
+    detail.data,
+    amenities.data,
+    roomAmenities.data,
+    roomCategory.data,
+    viewType.data,
+    boardBasis.data,
+    bedType.data,
+    currencies.data,
+    currency,
+  ]);
 
   // The draft is built ONCE, when the provider mounts. Building it before the
   // vocabularies arrive would resolve every amenity and bed to nothing and
@@ -83,7 +108,13 @@ export function WizardPage({ hotelId }: { hotelId?: string }) {
   // forever, which used to leave a hotel that failed to load showing a skeleton
   // that never resolved.
   const lookupsPending =
-    amenities.isLoading || bedType.isLoading || currencies.isLoading;
+    amenities.isLoading ||
+    roomAmenities.isLoading ||
+    roomCategory.isLoading ||
+    viewType.isLoading ||
+    boardBasis.isLoading ||
+    bedType.isLoading ||
+    currencies.isLoading;
 
   // Check the failure first, or the skeleton wins and the screen stays blank.
   if (hotelId && detail.isError) {

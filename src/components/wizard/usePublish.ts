@@ -11,7 +11,8 @@ export function usePublish() {
   const t = useTranslations('hotels');
   const tCommon = useTranslations('common');
   const tWizard = useTranslations('wizard');
-  const { draft, isNew, canPublish, submit, saveEdit, saveDraftNow, goTo } = useWizard();
+  const { draft, isNew, canPublish, lookupsReady, submit, saveEdit, saveDraftNow, goTo } =
+    useWizard();
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -19,6 +20,12 @@ export function usePublish() {
   const publish = useCallback(async () => {
     if (!canPublish) {
       goTo('review');
+      return;
+    }
+    // Creating shares the edit path's gate: publishing before the server's
+    // vocabularies land is accepted and quietly strips every optional field.
+    if (isNew && !lookupsReady) {
+      toast(tWizard('editLoading'), 'info');
       return;
     }
     setBusy(true);
@@ -70,6 +77,7 @@ export function usePublish() {
   }, [
     isNew,
     canPublish,
+    lookupsReady,
     submit,
     saveEdit,
     goTo,

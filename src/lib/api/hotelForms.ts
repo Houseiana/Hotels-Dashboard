@@ -262,6 +262,9 @@ export function buildCreateRoomTypeForm(
   room: RoomTypeFields & {
     beds?: HotelRoomBedPayload[];
     ratePlans?: RatePlanPayload[];
+    /** This endpoint takes priced extras too — `assign-services` is keyed by
+     *  room-type id, which a room being created does not have yet. */
+    services?: ServicePayload[];
     coverPhoto?: File;
     photos?: File[];
   },
@@ -270,6 +273,7 @@ export function buildCreateRoomTypeForm(
   writeRoomTypeFields(form, room);
   putObjects(form, 'beds', room.beds, writeBed);
   putObjects(form, 'ratePlans', room.ratePlans, writeRatePlan);
+  putObjects(form, 'services', room.services, writeService);
   put(form, 'coverPhoto', room.coverPhoto);
   putAll(form, 'photos', room.photos);
   return form;

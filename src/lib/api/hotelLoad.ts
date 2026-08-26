@@ -6,6 +6,7 @@ import {
   BED_NAMES,
   BOARD_NAMES,
   CATEGORY_NAMES,
+  ROOM_AMENITY_NAMES,
   VIEW_NAMES,
   reverseResolver,
   CANCELLATION_RULES,
@@ -37,6 +38,29 @@ function nameToSlug(names: Readonly<Record<string, string>>) {
   return (value: string | null | undefined): string | undefined => {
     if (!value) return undefined;
     return table.get(value.trim().toLowerCase());
+  };
+}
+
+/**
+ * The same, but a name we have no slug for is kept as `#<id>` rather than
+ * collapsed onto a default.
+ *
+ * Board, category and view all come back as names. Falling back to "Room Only"
+ * or "Standard" did not just mislabel the room: the next save wrote that
+ * default back, so a Loft quietly became a Standard and an All-Inclusive plan
+ * was torn down and recreated as Room Only at the same price.
+ */
+function nameToSlugKeeping(
+  names: Readonly<Record<string, string>>,
+  items: LookupItem[] | undefined,
+) {
+  const direct = nameToSlug(names);
+  const idByName = new Map((items ?? []).map((item) => [item.name.trim().toLowerCase(), item.id]));
+  return (value: string | null | undefined): string | undefined => {
+    const slug = direct(value);
+    if (slug) return slug;
+    const id = value ? idByName.get(value.trim().toLowerCase()) : undefined;
+    return id === undefined ? undefined : `#${id}`;
   };
 }
 
@@ -77,9 +101,15 @@ export function detailToDraft(
   fallbackCurrency: string,
 ): HotelDraft {
   const amenitySlug = reverseResolver(lookups.amenities as LookupItem[], AMENITY_NAMES);
-  const categorySlug = nameToSlug(CATEGORY_NAMES);
-  const viewSlug = nameToSlug(VIEW_NAMES);
-  const boardSlug = nameToSlug(BOARD_NAMES);
+  // A ROOM's amenities live in their own lookup — resolving them through the
+  // hotel's table dropped every one of them, or worse, matched an unrelated id.
+  const roomAmenitySlug = reverseResolver(
+    lookups.roomAmenities as LookupItem[],
+    ROOM_AMENITY_NAMES,
+  );
+  const categorySlug = nameToSlugKeeping(CATEGORY_NAMES, lookups.roomCategory);
+  const viewSlug = nameToSlugKeeping(VIEW_NAMES, lookups.viewType);
+  const boardSlug = nameToSlugKeeping(BOARD_NAMES, lookups.boardBasis);
   const bedSlug = nameToSlug(BED_NAMES);
   const bedById = reverseResolver(lookups.bedType as LookupItem[], BED_NAMES);
 
@@ -141,7 +171,7 @@ export function detailToDraft(
       inventory: nz(room.totalUnits),
       pricePerNight: cheapest,
       amenities: room.amenityIds.flatMap((id) => {
-        const slug = amenitySlug(id);
+        const slug = roomAmenitySlug(id);
         return slug ? [slug] : [];
       }),
       photos: room.photos.map((p) => p.url),
@@ -153,8 +183,18 @@ export function detailToDraft(
     };
   });
 
+  // The hotel has no currency of its own — it lives on each rate plan. Showing
+  // the account default while the plans were priced in something else meant the
+  // Basics screen stated a currency the hotel does not actually sell in.
+  const planCurrencyId = detail.roomTypes
+    .flatMap((room) => room.ratePlans)
+    .map((plan) => nz(plan.currencyId))
+    .find((id) => id !== undefined);
+  const planCurrency = lookups.currencies?.find((c) => c.id === planCurrencyId)?.code;
+
   return {
     ...base,
+    currency: planCurrency ?? base.currency,
     id: detail.id,
     status: detail.isActive ? 'active' : 'draft',
     name: detail.name,

@@ -9,7 +9,7 @@ import { useLookup } from '@/lib/query/lookups';
 import type { LookupName } from '@/lib/api/lookups';
 import { formatMoney } from '@/lib/utils';
 
-export type ServiceRow = { serviceId: number; price: number };
+export type ServiceRow = { serviceId: number; price?: number };
 
 /**
  * Priced extras, hotel-wide or per room type.
@@ -82,10 +82,16 @@ export function ServicesEditor({
     setAdding(false);
   };
 
+  /**
+   * An empty box stays empty. It used to become a real price of zero, which
+   * tells guests the extra is free — saving is blocked instead, so the owner
+   * decides rather than the input deciding for them.
+   */
   const setPriceFor = (serviceId: number, next: number | undefined) =>
-    onChange(
-      value.map((row) => (row.serviceId === serviceId ? { ...row, price: next ?? 0 } : row)),
-    );
+    onChange(value.map((row) => (row.serviceId === serviceId ? { ...row, price: next } : row)));
+
+  const priceMissing = (price: number | undefined) =>
+    typeof price !== 'number' || !Number.isFinite(price) || price <= 0;
 
   const remove = (serviceId: number) =>
     onChange(value.filter((row) => row.serviceId !== serviceId));
@@ -102,6 +108,10 @@ export function ServicesEditor({
     <>
       {types.isPending ? (
         <Skeleton className="h-16" />
+      ) : options.length === 0 ? (
+        // The lookup came back empty: there is no add button either, so say why
+        // rather than showing "none yet" beside nothing to press.
+        <p className="text-[13px] text-muted">{t('servicesEmpty')}</p>
       ) : value.length === 0 && !adding ? (
         <p className="text-[13px] text-muted">{t('servicesNoneYet')}</p>
       ) : (
@@ -120,11 +130,16 @@ export function ServicesEditor({
                     min={0}
                     step={25}
                     aria-label={`${nameOf(row.serviceId)} — ${t('servicePrice')}`}
+                    invalid={priceMissing(row.price)}
                     className="py-1.5 text-end text-[13px] font-bold"
                   />
                 </div>
-                <span className="hidden text-[11.5px] text-faint sm:inline latn">
-                  {formatMoney(row.price, currency, locale)}
+                <span className="hidden text-[11.5px] sm:inline latn">
+                  {priceMissing(row.price) ? (
+                    <span className="font-medium text-danger">{t('servicePriceRequired')}</span>
+                  ) : (
+                    <span className="text-faint">{formatMoney(row.price, currency, locale)}</span>
+                  )}
                 </span>
                 <button
                   type="button"

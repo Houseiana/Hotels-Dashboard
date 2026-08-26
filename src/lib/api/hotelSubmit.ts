@@ -8,6 +8,7 @@ import {
   CATEGORY_NAMES,
   PRICING_MODE_NAMES,
   PRICING_MODES_WITHOUT_VALUE,
+  ROOM_AMENITY_NAMES,
   looseMatch,
   VIEW_NAMES,
   resolver,
@@ -31,6 +32,14 @@ import { parseBedConfig } from '../utils';
 
 export type SubmitLookups = {
   amenities?: LookupItem[];
+  /**
+   * What a ROOM has, a separate vocabulary from the hotel's own amenities.
+   *
+   * Resolving room amenities through `amenities` looked like it worked and
+   * wasn't: no room slug is in that table, so every ticked in-room amenity
+   * resolved to `undefined` and was dropped on the way to the server.
+   */
+  roomAmenities?: LookupItem[];
   roomCategory?: LookupItem[];
   viewType?: LookupItem[];
   bedType?: LookupItem[];
@@ -39,6 +48,21 @@ export type SubmitLookups = {
   childPricingMode?: LookupItem[];
   currencies?: Array<{ id: number; code: string }>;
 };
+
+/**
+ * Service rows the API will accept.
+ *
+ * The draft lets a price be empty while the owner types; every save path is
+ * gated on the servicesPriced schema, so a row without one cannot reach here
+ * through the UI — this is the type boundary, not a silent drop.
+ */
+export function pricedServices(
+  rows: ReadonlyArray<{ serviceId: number; price?: number }>,
+): Array<{ serviceId: number; price: number }> {
+  return rows.flatMap((row) =>
+    typeof row.price === 'number' && Number.isFinite(row.price) ? [{ ...row, price: row.price }] : [],
+  );
+}
 
 const num = (v: number | undefined): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) ? v : undefined;
@@ -96,6 +120,11 @@ export function childrenPolicyPayload(
     return lookups.childPricingMode?.find((item) => looseMatch(item.name) === looseMatch(name))?.id;
   };
 
+  // The whole policy is replaced on save, so a band we cannot express would be
+  // DELETED server-side rather than left alone. Refuse the payload instead and
+  // let the caller report it — this is what the doc comment above promises.
+  if (policy.rules.some((rule) => modeId(rule.pricingMode) === undefined)) return undefined;
+
   const rules = policy.rules.flatMap((rule) => {
     const mode = modeId(rule.pricingMode);
     if (mode === undefined) return [];
@@ -127,6 +156,7 @@ export async function draftToCreatePayload(
   lookups: SubmitLookups,
 ): Promise<CreateHotelPayload> {
   const amenityId = resolver(lookups.amenities, AMENITY_NAMES);
+  const roomAmenityId = resolver(lookups.roomAmenities, ROOM_AMENITY_NAMES);
   const categoryId = resolver(lookups.roomCategory, CATEGORY_NAMES);
   const viewId = resolver(lookups.viewType, VIEW_NAMES);
   const bedId = resolver(lookups.bedType, BED_NAMES);
@@ -181,10 +211,10 @@ export async function draftToCreatePayload(
         return type === undefined ? [] : [{ bedType: type, count: bed.qty }];
       }),
       amenityIds: room.amenities.flatMap((slug) => {
-        const id = amenityId(slug);
+        const id = roomAmenityId(slug);
         return id === undefined ? [] : [id];
       }),
-      services: room.services,
+      services: pricedServices(room.services),
       ratePlans,
     };
   });
@@ -217,7 +247,7 @@ export async function draftToCreatePayload(
     }),
     roomTypes,
     policies: draft.houseRules,
-    services: draft.services,
+    services: pricedServices(draft.services),
     childrenPolicy: childrenPolicyPayload(draft, lookups),
     cover: coverFile,
     photos: photoFiles,

@@ -51,10 +51,25 @@ export const childrenPolicyDraftSchema = z.object({
 /**
  * A paid extra the owner has priced. Held in the draft so the wizard can edit
  * hotel- and room-level services before anything is saved.
+ *
+ * The price may be empty WHILE TYPING — clearing the box used to write a real
+ * price of zero, which tells guests the service is free. Saving is blocked
+ * until it is filled in; see `servicesPriced` below.
  */
 export const serviceDraftSchema = z.object({
   serviceId: z.number(),
-  price: z.number(),
+  price: draftNumber,
+});
+
+/**
+ * Every service row carries a real price.
+ *
+ * Applied to both the hotel's own extras and each room's, and to the publish
+ * gate — the shared guest model has no services, so nothing else would catch a
+ * half-filled row.
+ */
+const pricedService = z.object({
+  price: z.number({ message: 'servicePriceRequired' }).positive('servicePriceRequired'),
 });
 
 export const ratePlanDraftSchema = z.object({
@@ -68,7 +83,16 @@ export const ratePlanDraftSchema = z.object({
   currencyId: z.union([z.number(), z.undefined()]).optional(),
   id: z.string(),
   name: z.string().optional(),
-  boardBasis: boardBasisSchema,
+  /**
+   * Held as a plain string, not the shared enum.
+   *
+   * The server owns this vocabulary and currently offers two boards we have no
+   * slug for; those arrive as "#<id>". Under the enum a draft holding one
+   * failed to parse, and `loadDraft` throws an unparseable draft away — so
+   * picking All Inclusive silently wiped everything the owner had typed.
+   * Publishing still goes through `hotelSchema`, which is strict.
+   */
+  boardBasis: z.string(),
   pricePerNight: draftNumber,
   priceWithoutDiscount: draftNumber,
   discountPercent: draftNumber,
@@ -209,6 +233,7 @@ export const locationStepSchema = z.object({
 
 export const amenitiesStepSchema = z.object({
   amenities: z.array(z.string()).min(1, 'amenitiesRequired'),
+  services: z.array(pricedService),
 });
 
 export const photosStepSchema = z.object({
@@ -233,10 +258,13 @@ export const roomsStepSchema = z.object({
           .int('integerRequired')
           .min(1, 'inventoryMin'),
         pricePerNight: z.number({ message: 'priceRequired' }).positive('pricePositive'),
+        services: z.array(pricedService),
         ratePlans: z
           .array(
             z.object({
-              boardBasis: boardBasisSchema,
+              // Any board the server offers, ours or "#<id>" — see the draft
+              // schema above. The step only cares that a price is set.
+              boardBasis: z.string().min(1, 'boardRequired'),
               pricePerNight: z.number({ message: 'priceRequired' }).positive('pricePositive'),
             }),
           )
@@ -244,6 +272,17 @@ export const roomsStepSchema = z.object({
       }),
     )
     .min(1, 'roomTypeRequired'),
+});
+
+/**
+ * The service prices, checked at publish/save time as well as per step.
+ *
+ * `hotelSchema` cannot do this: services are an API concept the guest model
+ * does not carry, so without this a half-priced row would sail past the button.
+ */
+export const servicesPriced = z.object({
+  services: z.array(pricedService),
+  roomTypes: z.array(z.object({ services: z.array(pricedService) })),
 });
 
 /** Step 6 runs the real shared-model schema — exactly what the guest app parses. */
@@ -282,7 +321,13 @@ export function draftToHotel(draft: HotelDraft): Hotel {
         stripUndefined({
           id: rp.id,
           name: clean(rp.name),
-          boardBasis: rp.boardBasis,
+          // The guest model knows four boards; the server offers six. A board
+          // we have no slug for is projected onto the nearest legal value here
+          // ONLY — the draft keeps the real one, and the write path resolves it
+          // back to the server's id, so nothing is lost on save.
+          boardBasis: boardBasisSchema.safeParse(rp.boardBasis).success
+            ? (rp.boardBasis as Hotel['roomTypes'][number]['ratePlans'][number]['boardBasis'])
+            : 'roomOnly',
           pricePerNight: num(rp.pricePerNight) as number,
           priceWithoutDiscount: num(rp.priceWithoutDiscount),
           discountPercent: num(rp.discountPercent),

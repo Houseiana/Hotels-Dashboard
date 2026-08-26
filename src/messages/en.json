@@ -357,12 +357,14 @@
       "groupOther": "Other",
       "cardServices": "Paid services",
       "servicesHint": "Extras a guest pays for on top of the room rate.",
+      "servicesEmpty": "The server has no services on file yet, so there is nothing to price here.",
       "servicesNoneYet": "No services added yet.",
       "servicesAllAdded": "Every service the platform offers has been added.",
       "addService": "Add a service",
       "removeService": "Remove service",
       "serviceName": "Service",
       "servicePrice": "Price",
+      "servicePriceRequired": "Set a price",
       "roomServicesTitle": "Room services",
       "roomServicesHint": "Extras sold with this room type."
     },
@@ -435,6 +437,7 @@
       "removeService": "Remove service",
       "serviceName": "Service",
       "servicePrice": "Price",
+      "servicePriceRequired": "Set a price",
       "servicesNoneYet": "No services added yet.",
       "servicesAllAdded": "Every service the platform offers has been added.",
       "sectionIdentity": "What kind of room",
@@ -479,6 +482,7 @@
     "warning": {
       "coverPhotoNeedsUpload": "The cover photo stays as it was — the API can only set a cover from a newly uploaded file, not from a photo it already holds."
     },
+    "childModeUnknown": "One of the children age bands uses a pricing mode the server no longer offers, so the children policy was left untouched.",
     "ratePlanIncomplete": "This rate plan has no price yet, so it was not saved.",
     "localDraftNote": "You are looking at an unsaved draft kept in this browser, not the copy on the server. If the hotel was changed elsewhere since, saving will write your version over it.",
     "localDraftDiscard": "Discard the draft and reload the server copy"
@@ -698,6 +702,8 @@
     "priceRequired": "Enter a nightly price.",
     "pricePositive": "Price must be greater than 0.",
     "discountRange": "Discount must be between 0 and 100.",
+    "boardRequired": "Pick a board basis for this rate plan.",
+    "servicePriceRequired": "Every paid service needs a price above zero.",
     "ratePlanRequired": "Add at least one rate plan.",
     "integerRequired": "Enter a whole number.",
     "timeFormat": "Use a 24-hour time such as 15:00.",
