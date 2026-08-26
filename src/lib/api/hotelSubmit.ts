@@ -50,18 +50,19 @@ export type SubmitLookups = {
 };
 
 /**
- * Service rows the API will accept.
+ * Service rows in the API's shape.
  *
- * The draft lets a price be empty while the owner types; every save path is
- * gated on the servicesPriced schema, so a row without one cannot reach here
- * through the UI — this is the type boundary, not a silent drop.
+ * `price` is nullable on their side, so a service the hotel quotes on request
+ * is sent WITHOUT one. Omitting the field is not the same as sending zero —
+ * zero would tell guests the extra is free.
  */
-export function pricedServices(
+export function serviceRows(
   rows: ReadonlyArray<{ serviceId: number; price?: number }>,
-): Array<{ serviceId: number; price: number }> {
-  return rows.flatMap((row) =>
-    typeof row.price === 'number' && Number.isFinite(row.price) ? [{ ...row, price: row.price }] : [],
-  );
+): Array<{ serviceId: number; price?: number }> {
+  return rows.map((row) => ({
+    serviceId: row.serviceId,
+    price: typeof row.price === 'number' && Number.isFinite(row.price) ? row.price : undefined,
+  }));
 }
 
 const num = (v: number | undefined): number | undefined =>
@@ -107,7 +108,8 @@ export function childrenPolicyPayload(
       rules: Array<{
         minAge: number;
         maxAge: number;
-        ordinal: number;
+        /** Nullable: a band need not single out which child it prices. */
+        ordinal?: number;
         pricingMode: number;
         value?: number;
       }>;
@@ -214,7 +216,7 @@ export async function draftToCreatePayload(
         const id = roomAmenityId(slug);
         return id === undefined ? [] : [id];
       }),
-      services: pricedServices(room.services),
+      services: serviceRows(room.services),
       ratePlans,
     };
   });
@@ -247,7 +249,7 @@ export async function draftToCreatePayload(
     }),
     roomTypes,
     policies: draft.houseRules,
-    services: pricedServices(draft.services),
+    services: serviceRows(draft.services),
     childrenPolicy: childrenPolicyPayload(draft, lookups),
     cover: coverFile,
     photos: photoFiles,

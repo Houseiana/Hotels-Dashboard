@@ -19,8 +19,9 @@ export type ServiceRow = { serviceId: number; price?: number };
  * what stops the two screens drifting apart.
  *
  * A service is ADDED rather than shown as a row of empty price boxes: the API
- * stores only what the hotel actually sells, and a price of zero would claim
- * the service is free rather than not offered.
+ * stores only what the hotel actually sells. The PRICE is optional — it is
+ * nullable server-side, for extras the hotel quotes on request — but an empty
+ * box stays empty rather than becoming zero, which would say it is free.
  */
 export function ServicesEditor({
   lookup,
@@ -77,21 +78,21 @@ export function ServicesEditor({
   };
 
   const confirmAdd = () => {
-    if (!pick || typeof price !== 'number') return;
+    if (!pick) return;
     onChange([...value, { serviceId: pick, price }]);
     setAdding(false);
   };
 
   /**
-   * An empty box stays empty. It used to become a real price of zero, which
-   * tells guests the extra is free — saving is blocked instead, so the owner
-   * decides rather than the input deciding for them.
+   * An empty box stays empty rather than becoming a price of zero — the API
+   * takes a null price, and "quoted on request" is a real thing a hotel offers.
+   * Zero would tell guests the extra is free.
    */
   const setPriceFor = (serviceId: number, next: number | undefined) =>
     onChange(value.map((row) => (row.serviceId === serviceId ? { ...row, price: next } : row)));
 
-  const priceMissing = (price: number | undefined) =>
-    typeof price !== 'number' || !Number.isFinite(price) || price <= 0;
+  const hasPrice = (price: number | undefined) =>
+    typeof price === 'number' && Number.isFinite(price);
 
   const remove = (serviceId: number) =>
     onChange(value.filter((row) => row.serviceId !== serviceId));
@@ -130,16 +131,14 @@ export function ServicesEditor({
                     min={0}
                     step={25}
                     aria-label={`${nameOf(row.serviceId)} — ${t('servicePrice')}`}
-                    invalid={priceMissing(row.price)}
+                    placeholder={t('servicePriceOnRequest')}
                     className="py-1.5 text-end text-[13px] font-bold"
                   />
                 </div>
-                <span className="hidden text-[11.5px] sm:inline latn">
-                  {priceMissing(row.price) ? (
-                    <span className="font-medium text-danger">{t('servicePriceRequired')}</span>
-                  ) : (
-                    <span className="text-faint">{formatMoney(row.price, currency, locale)}</span>
-                  )}
+                <span className="hidden text-[11.5px] text-faint sm:inline latn">
+                  {hasPrice(row.price)
+                    ? formatMoney(row.price, currency, locale)
+                    : t('servicePriceOnRequest')}
                 </span>
                 <button
                   type="button"
@@ -174,13 +173,16 @@ export function ServicesEditor({
                 })}
               </Select>
             </Field>
-            <Field label={t('servicePrice')} required>
+            {/* Optional: `ServiceAssignmentDto.price` is nullable, so an extra
+                can be listed and quoted on request. */}
+            <Field label={t('servicePrice')} help={t('servicePriceHint')}>
               <NumberInput
                 value={price}
                 onValueChange={setPrice}
                 min={0}
                 step={25}
                 aria-label={t('servicePrice')}
+                placeholder={t('servicePriceOnRequest')}
                 className="text-end font-bold"
               />
             </Field>
@@ -190,7 +192,7 @@ export function ServicesEditor({
               size="sm"
               variant="primary"
               onClick={confirmAdd}
-              disabled={!pick || typeof price !== 'number'}
+              disabled={!pick}
             >
               {t('addService')}
             </Button>

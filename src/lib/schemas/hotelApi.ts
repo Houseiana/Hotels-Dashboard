@@ -99,9 +99,17 @@ export type HotelService = z.infer<typeof hotelServiceSchema>;
  */
 export const childRuleSchema = z.object({
   minAge: z.number(),
-  maxAge: z.number(),
-  /** Which child this band prices: 1st, 2nd, 3rd… Always at least 1. */
-  ordinal: z.number(),
+  /** Nullable, like `ordinal` — an open-ended band runs to the policy's max. */
+  maxAge: z.number().nullable().optional(),
+  /**
+   * Which child this band prices: 1st, 2nd, 3rd…
+   *
+   * Nullable. Most policies read "ages 0–5 are free" and never single a child
+   * out — and `UpsertChildrenPricingRuleDto.ordinal` is nullable on the write
+   * side too. Requiring it here made the WHOLE hotel fail to parse, so one
+   * ordinal-less band turned the screen into "hotel not found".
+   */
+  ordinal: z.number().nullable().optional(),
   pricingMode: z.string().nullable().optional(),
   value: z.number().nullable().optional(),
 });

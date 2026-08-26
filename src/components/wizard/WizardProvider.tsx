@@ -13,7 +13,6 @@ import {
 import {
   draftToHotel,
   emptyDraft,
-  servicesPriced,
   STEP_SCHEMAS,
   WIZARD_STEPS,
   type HotelDraft,
@@ -30,7 +29,7 @@ import type { HotelDetail } from '@/lib/schemas/hotelApi';
 import { queryKeys } from '@/lib/query/keys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/components/providers/SessionProvider';
-import { childrenPolicyPayload, draftToCreateForm, pricedServices } from '@/lib/api/hotelSubmit';
+import { childrenPolicyPayload, draftToCreateForm, serviceRows } from '@/lib/api/hotelSubmit';
 import { hotelsApi } from '@/lib/api/hotels';
 import { clearDraft, loadDraft, saveDraft, NEW_DRAFT_KEY } from '@/lib/wizard/draftStore';
 import { makeId } from '@/lib/utils';
@@ -345,11 +344,7 @@ export function WizardProvider({
   // Step 6 runs the real shared-model schema — the exact gate the guest app uses.
   const publishIssues = useMemo(() => {
     const result = hotelSchema.safeParse({ ...draftToHotel(draft), status: 'active' });
-    const issues = result.success ? [] : collectIssues(result.error);
-    // Services live outside the shared model, so their prices are checked
-    // separately — a row with an empty price must not be saveable.
-    const priced = servicesPriced.safeParse(draft);
-    return priced.success ? issues : [...issues, ...collectIssues(priced.error)];
+    return result.success ? [] : collectIssues(result.error);
   }, [draft]);
 
   const issuesFor = useCallback(
@@ -410,7 +405,7 @@ export function WizardProvider({
     // the new hotel.
     if (id && latest.current.services.length > 0) {
       try {
-        await hotelsApi.assignServices(id, pricedServices(latest.current.services));
+        await hotelsApi.assignServices(id, serviceRows(latest.current.services));
       } catch {
         // Already sent with the create; not worth failing the publish over.
       }

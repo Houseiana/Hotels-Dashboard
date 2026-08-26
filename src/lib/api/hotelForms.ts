@@ -11,7 +11,8 @@
 /** A paid extra as the WRITE side names it (`serviceId`, not `id`). */
 export type ServicePayload = {
   serviceId: number;
-  price: number;
+  /** Nullable server-side: an extra the hotel quotes on request has no price. */
+  price?: number;
 };
 
 export type HotelRoomBedPayload = {
@@ -79,7 +80,7 @@ export type CreateHotelPayload = {
     rules: Array<{
       minAge: number;
       maxAge: number;
-      ordinal: number;
+      ordinal?: number;
       pricingMode: number;
       value?: number;
     }>;

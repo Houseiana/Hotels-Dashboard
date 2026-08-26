@@ -36,7 +36,8 @@ const draftNumber = z.union([z.number(), z.nan(), z.undefined()]).optional();
 export const childRuleDraftSchema = z.object({
   minAge: z.number(),
   maxAge: z.number(),
-  ordinal: z.number(),
+  /** Which child this prices; empty means it applies to any child. */
+  ordinal: z.union([z.number(), z.undefined()]).optional(),
   pricingMode: z.string(),
   value: z.union([z.number(), z.undefined()]).optional(),
 });
@@ -52,25 +53,16 @@ export const childrenPolicyDraftSchema = z.object({
  * A paid extra the owner has priced. Held in the draft so the wizard can edit
  * hotel- and room-level services before anything is saved.
  *
- * The price may be empty WHILE TYPING — clearing the box used to write a real
- * price of zero, which tells guests the service is free. Saving is blocked
- * until it is filled in; see `servicesPriced` below.
+ * The price is OPTIONAL: `ServiceAssignmentDto.price` is nullable, and a hotel
+ * may well list an extra it quotes on request. An empty box therefore stays
+ * empty rather than becoming a real price of zero, which would tell guests the
+ * service is free.
  */
 export const serviceDraftSchema = z.object({
   serviceId: z.number(),
   price: draftNumber,
 });
 
-/**
- * Every service row carries a real price.
- *
- * Applied to both the hotel's own extras and each room's, and to the publish
- * gate — the shared guest model has no services, so nothing else would catch a
- * half-filled row.
- */
-const pricedService = z.object({
-  price: z.number({ message: 'servicePriceRequired' }).positive('servicePriceRequired'),
-});
 
 export const ratePlanDraftSchema = z.object({
   /**
@@ -233,7 +225,6 @@ export const locationStepSchema = z.object({
 
 export const amenitiesStepSchema = z.object({
   amenities: z.array(z.string()).min(1, 'amenitiesRequired'),
-  services: z.array(pricedService),
 });
 
 export const photosStepSchema = z.object({
@@ -258,7 +249,6 @@ export const roomsStepSchema = z.object({
           .int('integerRequired')
           .min(1, 'inventoryMin'),
         pricePerNight: z.number({ message: 'priceRequired' }).positive('pricePositive'),
-        services: z.array(pricedService),
         ratePlans: z
           .array(
             z.object({
@@ -272,17 +262,6 @@ export const roomsStepSchema = z.object({
       }),
     )
     .min(1, 'roomTypeRequired'),
-});
-
-/**
- * The service prices, checked at publish/save time as well as per step.
- *
- * `hotelSchema` cannot do this: services are an API concept the guest model
- * does not carry, so without this a half-priced row would sail past the button.
- */
-export const servicesPriced = z.object({
-  services: z.array(pricedService),
-  roomTypes: z.array(z.object({ services: z.array(pricedService) })),
 });
 
 /** Step 6 runs the real shared-model schema — exactly what the guest app parses. */

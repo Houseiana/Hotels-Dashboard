@@ -15,7 +15,8 @@ import { useWizard } from '../WizardProvider';
 type Band = {
   minAge: number;
   maxAge: number;
-  ordinal: number;
+  /** Empty when the band applies to any child rather than the Nth one. */
+  ordinal?: number;
   pricingMode: string;
   value?: number;
 };
@@ -40,7 +41,9 @@ function bandProblem(
 ): string | undefined {
   if (band.maxAge < band.minAge) return 'childAgeOrder';
   if (band.minAge < minChildAge || band.maxAge > maxChildAge) return 'childAgeOutside';
-  if (band.ordinal < 1) return 'childOrdinalMin';
+  // Optional server-side: a policy is often just "ages 0-5 are free", with no
+  // need to say first child, second child, and so on.
+  if (band.ordinal !== undefined && band.ordinal < 1) return 'childOrdinalMin';
   if (carriesValue(band.pricingMode)) {
     if (typeof band.value !== 'number') return 'childValueRequired';
     // A 0% discount is a legal percentage — the server only requires a fixed
@@ -51,7 +54,8 @@ function bandProblem(
       return 'childValueRequired';
     }
   }
-  // Bands may share an age range only when they price a DIFFERENT child.
+  // Bands may share an age range only when they price a DIFFERENT child. Two
+  // bands that both leave it empty count as the same child.
   const clash = existing.some(
     (other) =>
       other.ordinal === band.ordinal &&
@@ -85,7 +89,7 @@ export function ChildrenPolicyCard() {
   const [band, setBand] = useState<Band>({
     minAge: 0,
     maxAge: 5,
-    ordinal: 1,
+    ordinal: undefined,
     pricingMode: 'free',
   });
 
@@ -125,11 +129,11 @@ export function ChildrenPolicyCard() {
   const openDialog = () => {
     // Start after the last band rather than across the whole range, which
     // opened the dialog already showing an overlap it caused itself.
-    const firstChild = policy.rules.filter((rule) => rule.ordinal === 1);
+    const firstChild = policy.rules.filter((rule) => rule.ordinal === undefined);
     const from = firstChild.length
       ? Math.min(maxAge, Math.max(...firstChild.map((rule) => rule.maxAge)) + 1)
       : minAge;
-    setBand({ minAge: from, maxAge, ordinal: 1, pricingMode: modeSlugs[0] ?? 'free' });
+    setBand({ minAge: from, maxAge, ordinal: undefined, pricingMode: modeSlugs[0] ?? 'free' });
     setAdding(true);
   };
 
@@ -215,7 +219,9 @@ export function ChildrenPolicyCard() {
                     className="flex flex-wrap items-center gap-3 rounded-[var(--radius-ctl)] border border-line px-3.5 py-2.5"
                   >
                     <Chip tone="neutral" className="px-2 py-0 text-[11px]">
-                      {t('nthChild', { n: rule.ordinal })}
+                      {rule.ordinal === undefined
+                        ? t('anyChild')
+                        : t('nthChild', { n: rule.ordinal })}
                     </Chip>
                     <span className="text-[13.5px] font-medium text-ink latn">
                       {t('ageRange', { from: rule.minAge, to: rule.maxAge })}
@@ -277,10 +283,12 @@ export function ChildrenPolicyCard() {
                 aria-label={t('bandTo')}
               />
             </Field>
-            <Field label={t('ordinal')} help={t('ordinalHint')} required>
+            {/* Optional: most policies read "ages 0–5 are free" and never
+                single out the first or second child. */}
+            <Field label={t('ordinal')} help={t('ordinalHint')}>
               <NumberInput
                 value={band.ordinal}
-                onValueChange={(v) => setBand({ ...band, ordinal: v ?? 1 })}
+                onValueChange={(v) => setBand({ ...band, ordinal: v })}
                 min={1}
                 max={9}
                 aria-label={t('ordinal')}

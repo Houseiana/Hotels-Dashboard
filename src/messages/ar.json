@@ -311,7 +311,8 @@
       "childOrdinalMin": "«الطفل رقم» بيبدأ من ١.",
       "childValueRequired": "التسعير ده محتاج مبلغ أكبر من صفر.",
       "childPercentRange": "الخصم ما ينفعش يزيد عن ١٠٠٪.",
-      "childBandOverlap": "الشريحة دي بتتداخل مع شريحة تانية لنفس الطفل."
+      "childBandOverlap": "الشريحة دي بتتداخل مع شريحة تانية لنفس الطفل.",
+      "anyChild": "أي طفل"
     },
     "location": {
       "title": "الموقع",
@@ -364,9 +365,10 @@
       "removeService": "حذف الخدمة",
       "serviceName": "الخدمة",
       "servicePrice": "السعر",
-      "servicePriceRequired": "حدّد السعر",
       "roomServicesTitle": "خدمات الغرفة",
-      "roomServicesHint": "خدمات بتتباع مع نوع الغرفة ده."
+      "roomServicesHint": "خدمات بتتباع مع نوع الغرفة ده.",
+      "servicePriceOnRequest": "حسب الطلب",
+      "servicePriceHint": "سيبها فاضية لو السعر بيتحدد حسب الطلب."
     },
     "photos": {
       "title": "الصور",
@@ -437,7 +439,6 @@
       "removeService": "حذف الخدمة",
       "serviceName": "الخدمة",
       "servicePrice": "السعر",
-      "servicePriceRequired": "حدّد السعر",
       "servicesNoneYet": "مفيش خدمات مضافة.",
       "servicesAllAdded": "كل الخدمات المتاحة اتضافت.",
       "sectionIdentity": "الغرفة دي إيه",
@@ -447,7 +448,9 @@
       "sectionInside": "اللي جواها",
       "sectionInsideHint": "المرافق والوصف",
       "sectionSelling": "بتتباع إزاي",
-      "sectionSellingHint": "خطط الأسعار والخدمات"
+      "sectionSellingHint": "خطط الأسعار والخدمات",
+      "servicePriceOnRequest": "حسب الطلب",
+      "servicePriceHint": "سيبها فاضية لو السعر بيتحدد حسب الطلب."
     },
     "review": {
       "title": "المراجعة والنشر",
@@ -703,7 +706,6 @@
     "pricePositive": "السعر يجب أن يكون أكبر من ٠.",
     "discountRange": "الخصم يجب أن يكون بين ٠ و١٠٠.",
     "boardRequired": "اختار نظام الإقامة لخطة السعر دي.",
-    "servicePriceRequired": "كل خدمة مدفوعة لازم يكون ليها سعر أكبر من صفر.",
     "ratePlanRequired": "أضف خطة سعر واحدة على الأقل.",
     "integerRequired": "أدخل رقمًا صحيحًا.",
     "timeFormat": "استخدم صيغة ٢٤ ساعة مثل 15:00.",

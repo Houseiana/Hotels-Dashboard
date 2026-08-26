@@ -177,7 +177,7 @@ export function detailToDraft(
       photos: room.photos.map((p) => p.url),
       services: room.services.map((service) => ({
         serviceId: service.id,
-        price: service.price ?? 0,
+        price: nz(service.price),
       })),
       ratePlans,
     };
@@ -231,7 +231,7 @@ export function detailToDraft(
     },
     services: detail.services.map((service) => ({
       serviceId: service.id,
-      price: service.price ?? 0,
+      price: nz(service.price),
     })),
     // `pricingMode` comes back as a NAME; the wizard holds our slug.
     childrenPolicy: {
@@ -240,8 +240,9 @@ export function detailToDraft(
       maxChildAge: nz(detail.childrenPolicy?.maxChildAge) ?? 12,
       rules: (detail.childrenPolicy?.rules ?? []).map((rule) => ({
         minAge: rule.minAge,
-        maxAge: rule.maxAge,
-        ordinal: rule.ordinal,
+        // An open-ended band runs to the oldest age still counted as a child.
+        maxAge: nz(rule.maxAge) ?? nz(detail.childrenPolicy?.maxChildAge) ?? 12,
+        ordinal: nz(rule.ordinal),
         pricingMode: pricingSlug(rule.pricingMode) ?? 'free',
         value: nz(rule.value),
       })),

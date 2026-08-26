@@ -20,7 +20,7 @@ import {
   type RatePlanPayload,
 } from './hotelForms';
 import { hotelsApi } from './hotels';
-import { childrenPolicyPayload, pricedServices, type SubmitLookups } from './hotelSubmit';
+import { childrenPolicyPayload, serviceRows, type SubmitLookups } from './hotelSubmit';
 import { parseBedConfig } from '../utils';
 
 /* ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ export async function applyHotelEdit(
 
   if (serviceKey(draft.services) !== serviceKey(original.services)) {
     await run('services', draft.name.trim() || detail.name, () =>
-      hotelsApi.assignServices(detail.id, pricedServices(draft.services)),
+      hotelsApi.assignServices(detail.id, serviceRows(draft.services)),
     );
   }
 
@@ -338,8 +338,10 @@ export async function applyHotelEdit(
       allowed: policy.childrenAllowed,
       min: policy.minChildAge,
       max: policy.maxChildAge,
+      // A band without an ordinal sorts first; subtracting undefined gives
+      // NaN, which made the comparison meaningless and the key unstable.
       rules: [...policy.rules].sort(
-        (a, b) => a.ordinal - b.ordinal || a.minAge - b.minAge,
+        (a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0) || a.minAge - b.minAge,
       ),
     });
 
@@ -392,7 +394,7 @@ export async function applyHotelEdit(
             amenityIds: slugRoomAmenityIds(room.amenities),
             // Sent with the create: the assign-services call below is keyed by
             // room-type id, which this room will not have until it exists.
-            services: pricedServices(room.services),
+            services: serviceRows(room.services),
             ratePlans: room.ratePlans.flatMap((plan) => {
               const body = planBody(plan);
               if (!body) {
@@ -418,7 +420,7 @@ export async function applyHotelEdit(
     // written for a room the server already has.
     if (serviceKey(room.services) !== serviceKey(beforeDraft?.services ?? [])) {
       await run('roomServices', room.name, () =>
-        hotelsApi.assignRoomServices(room.id, pricedServices(room.services)),
+        hotelsApi.assignRoomServices(room.id, serviceRows(room.services)),
       );
     }
 

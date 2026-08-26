@@ -196,7 +196,7 @@ export const hotelsApi = {
    */
   async assignServices(
     hotelId: string,
-    services: Array<{ serviceId: number; price: number }>,
+    services: Array<{ serviceId: number; price?: number }>,
   ): Promise<void> {
     await request(`/api/hotels/${hotelId}/services`, z.unknown(), {
       method: 'POST',
@@ -207,7 +207,7 @@ export const hotelsApi = {
   /** `POST /api/room-types/{roomTypeId}/services` — same, per room type. */
   async assignRoomServices(
     roomTypeId: string,
-    services: Array<{ serviceId: number; price: number }>,
+    services: Array<{ serviceId: number; price?: number }>,
   ): Promise<void> {
     await request(`/api/room-types/${roomTypeId}/services`, z.unknown(), {
       method: 'POST',
@@ -232,7 +232,7 @@ export const hotelsApi = {
       rules: Array<{
         minAge: number;
         maxAge: number;
-        ordinal: number;
+        ordinal?: number;
         pricingMode: number;
         value?: number;
       }>;

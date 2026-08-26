@@ -36,8 +36,10 @@ export function HotelChildrenCard({
   const labels = useCatalogLabels();
 
   const allowed = policy?.childrenAllowed ?? false;
+  // A band without an ordinal applies to any child and sorts first; the API
+  // returns null for it, and subtracting null gave NaN.
   const rules = [...(policy?.rules ?? [])].sort(
-    (a, b) => a.ordinal - b.ordinal || a.minAge - b.minAge,
+    (a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0) || a.minAge - b.minAge,
   );
 
   const describe = (mode: string | null | undefined, value: number | null | undefined) => {
@@ -73,10 +75,16 @@ export function HotelChildrenCard({
                 className="flex flex-wrap items-center gap-2.5 rounded-[var(--radius-ctl)] px-2.5 py-2 odd:bg-surface-2"
               >
                 <Chip tone="neutral" className="px-2 py-0 text-[11px]">
-                  {tBasics('nthChild', { n: rule.ordinal })}
+                  {typeof rule.ordinal === 'number'
+                    ? tBasics('nthChild', { n: rule.ordinal })
+                    : tBasics('anyChild')}
                 </Chip>
                 <span className="text-[13px] text-ink latn">
-                  {tBasics('ageRange', { from: rule.minAge, to: rule.maxAge })}
+                  {tBasics('ageRange', {
+                    from: rule.minAge,
+                    // Open-ended bands run to the policy's own maximum.
+                    to: rule.maxAge ?? policy?.maxChildAge ?? 12,
+                  })}
                 </span>
                 <span className="ms-auto text-[13px] font-semibold text-ink">
                   {describe(rule.pricingMode, rule.value)}

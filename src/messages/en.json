@@ -311,7 +311,8 @@
       "childOrdinalMin": "“Which child” starts at 1.",
       "childValueRequired": "This pricing needs an amount greater than zero.",
       "childPercentRange": "A discount cannot be more than 100%.",
-      "childBandOverlap": "This overlaps a band you already set for the same child."
+      "childBandOverlap": "This overlaps a band you already set for the same child.",
+      "anyChild": "Any child"
     },
     "location": {
       "title": "Location",
@@ -364,9 +365,10 @@
       "removeService": "Remove service",
       "serviceName": "Service",
       "servicePrice": "Price",
-      "servicePriceRequired": "Set a price",
       "roomServicesTitle": "Room services",
-      "roomServicesHint": "Extras sold with this room type."
+      "roomServicesHint": "Extras sold with this room type.",
+      "servicePriceOnRequest": "On request",
+      "servicePriceHint": "Leave empty if the price is quoted on request."
     },
     "photos": {
       "title": "Photos",
@@ -437,7 +439,6 @@
       "removeService": "Remove service",
       "serviceName": "Service",
       "servicePrice": "Price",
-      "servicePriceRequired": "Set a price",
       "servicesNoneYet": "No services added yet.",
       "servicesAllAdded": "Every service the platform offers has been added.",
       "sectionIdentity": "What kind of room",
@@ -447,7 +448,9 @@
       "sectionInside": "What's inside",
       "sectionInsideHint": "amenities and description",
       "sectionSelling": "How it sells",
-      "sectionSellingHint": "rate plans and paid extras"
+      "sectionSellingHint": "rate plans and paid extras",
+      "servicePriceOnRequest": "On request",
+      "servicePriceHint": "Leave empty if the price is quoted on request."
     },
     "review": {
       "title": "Review & publish",
@@ -703,7 +706,6 @@
     "pricePositive": "Price must be greater than 0.",
     "discountRange": "Discount must be between 0 and 100.",
     "boardRequired": "Pick a board basis for this rate plan.",
-    "servicePriceRequired": "Every paid service needs a price above zero.",
     "ratePlanRequired": "Add at least one rate plan.",
     "integerRequired": "Enter a whole number.",
     "timeFormat": "Use a 24-hour time such as 15:00.",
