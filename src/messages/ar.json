@@ -447,6 +447,10 @@
       "sectionCapacityHint": "الحجم، كام ضيف، كام غرفة",
       "sectionInside": "اللي جواها",
       "sectionInsideHint": "المرافق والوصف",
+      "sectionPhotos": "صور الغرفة دي",
+      "sectionPhotosHint": "غلاف ومعرض خاص بيها",
+      "photosHint": "اسحب لإعادة الترتيب · الصورة الأولى هي غلاف الغرفة",
+      "photosEmpty": "مفيش صور لسه. من غيرها الغرفة بتظهر بغلاف الفندق.",
       "sectionSelling": "بتتباع إزاي",
       "sectionSellingHint": "خطط الأسعار والخدمات",
       "servicePriceOnRequest": "حسب الطلب",
@@ -794,12 +798,14 @@
       "roomOnly": "الغرفة فقط",
       "breakfast": "مبيت وإفطار",
       "halfBoard": "نصف إقامة",
-      "fullBoard": "إقامة كاملة"
+      "fullBoard": "إقامة كاملة",
+      "allInclusive": "شامل كل شيء",
+      "ultraAllInclusive": "شامل كل شيء بلس"
     },
     "cancellation": {
-      "free24h": "إلغاء مجاني · ٢٤ ساعة",
-      "free48h": "إلغاء مجاني · ٤٨ ساعة",
-      "free7d": "إلغاء مجاني · ٧ أيام",
+      "free24h": "إلغاء مجاني حتى ٢٤ ساعة قبل الوصول",
+      "free48h": "إلغاء مجاني حتى ٤٨ ساعة قبل الوصول",
+      "free7d": "إلغاء مجاني حتى ٧ أيام قبل الوصول",
       "nonRefundable": "غير قابل للاسترداد"
     },
     "bookingStatus": {

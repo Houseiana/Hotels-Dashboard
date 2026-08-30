@@ -48,6 +48,8 @@ export const BOARD_NAMES: SlugTable = {
   breakfast: 'Bed & Breakfast',
   halfBoard: 'Half Board',
   fullBoard: 'Full Board',
+  allInclusive: 'All Inclusive',
+  ultraAllInclusive: 'Ultra All Inclusive',
 };
 
 /**

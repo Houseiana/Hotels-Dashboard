@@ -380,10 +380,14 @@ export function HotelDetailView({ hotelId }: { hotelId: string }) {
                             <span className="font-semibold text-ink">
                               {labels.boardBasis(plan.boardBasis)}
                             </span>
+                            {/* The window, not a bare "Cancellation": a guest
+                                needs to know how long before check-in the plan
+                                is still free, and the draft carries it. */}
                             <Chip tone={plan.refundable ? 'active' : 'neutral'}>
-                              {plan.refundable
-                                ? tWizard('rooms.colCancellation')
-                                : labels.cancellation('nonRefundable')}
+                              {labels.cancellation(
+                                plan.cancellation ||
+                                  (plan.refundable ? 'free24h' : 'nonRefundable'),
+                              )}
                             </Chip>
                             <span className="font-bold text-ink latn">
                               {formatMoney(

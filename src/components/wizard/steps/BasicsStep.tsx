@@ -15,7 +15,7 @@ import {
   Toggle,
 } from '@/components/ui/form';
 import { API_SUPPORTS } from '@/lib/api/capabilities';
-import { CURRENCIES } from '@/lib/catalogs';
+import { useCurrencyLookup } from '@/lib/query/lookups';
 import { useCatalogLabels } from '@/lib/useLabels';
 import { useWizard } from '../WizardProvider';
 import { HouseRulesCard } from './HouseRulesCard';
@@ -27,6 +27,18 @@ export function BasicsStep() {
   const labels = useCatalogLabels();
   const { draft, update, errorsFor } = useWizard();
   const errors = errorsFor('basics');
+
+  /**
+   * The currency list comes from the server, not from the local catalogue: a
+   * code the lookup does not carry has no `currencyId`, so every rate plan
+   * priced in it would reach the API with no currency at all. Our translations
+   * still supply the Arabic name, falling back to the server's English one.
+   */
+  const currencies = useCurrencyLookup();
+  const currencyOptions = (currencies.data ?? []).map((item) => ({
+    code: item.code,
+    label: labels.currency(item.code) === item.code ? item.name : labels.currency(item.code),
+  }));
 
   const policies = draft.policies ?? {};
   const setPolicy = (patch: Partial<typeof policies>) =>
@@ -125,10 +137,18 @@ export function BasicsStep() {
                 value={draft.currency}
                 onChange={(e) => update({ currency: e.target.value })}
                 invalid={Boolean(errors['currency'])}
+                disabled={currencies.isPending}
               >
-                {CURRENCIES.map((code) => (
-                  <option key={code} value={code}>
-                    {code} · {labels.currency(code)}
+                {/* A currency the server dropped still renders, or editing an
+                    existing hotel would silently blank the field. */}
+                {draft.currency && !currencyOptions.some((o) => o.code === draft.currency) ? (
+                  <option value={draft.currency}>
+                    {draft.currency} · {labels.currency(draft.currency)}
+                  </option>
+                ) : null}
+                {currencyOptions.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.code} · {option.label}
                   </option>
                 ))}
               </Select>

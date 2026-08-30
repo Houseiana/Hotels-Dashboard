@@ -19,6 +19,11 @@ export const boardBasisSchema = z.enum([
   'breakfast',
   'halfBoard',
   'fullBoard',
+  // The server sells these two as well. Without them a plan priced All
+  // Inclusive collapsed to 'roomOnly' on the way to the guest model, so the
+  // guest card advertised the wrong board.
+  'allInclusive',
+  'ultraAllInclusive',
 ]);
 
 export const hotelStatusSchema = z.enum(['draft', 'active']);

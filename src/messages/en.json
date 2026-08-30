@@ -447,6 +447,10 @@
       "sectionCapacityHint": "how big, how many guests, how many rooms",
       "sectionInside": "What's inside",
       "sectionInsideHint": "amenities and description",
+      "sectionPhotos": "Photos of this room",
+      "sectionPhotosHint": "its own cover and gallery",
+      "photosHint": "Drag to reorder · first photo is this room’s cover",
+      "photosEmpty": "No photos yet. Without them the room shows the hotel cover.",
       "sectionSelling": "How it sells",
       "sectionSellingHint": "rate plans and paid extras",
       "servicePriceOnRequest": "On request",
@@ -794,12 +798,14 @@
       "roomOnly": "Room only",
       "breakfast": "Bed & breakfast",
       "halfBoard": "Half board",
-      "fullBoard": "Full board"
+      "fullBoard": "Full board",
+      "allInclusive": "All inclusive",
+      "ultraAllInclusive": "Ultra all inclusive"
     },
     "cancellation": {
-      "free24h": "Free cancel · 24h",
-      "free48h": "Free cancel · 48h",
-      "free7d": "Free cancel · 7 days",
+      "free24h": "Free cancellation until 24h before check-in",
+      "free48h": "Free cancellation until 48h before check-in",
+      "free7d": "Free cancellation until 7 days before check-in",
       "nonRefundable": "Non-refundable"
     },
     "bookingStatus": {

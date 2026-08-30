@@ -77,6 +77,8 @@ export const BOARD_BASES: BoardBasis[] = [
   'breakfast',
   'halfBoard',
   'fullBoard',
+  'allInclusive',
+  'ultraAllInclusive',
 ];
 
 /** Board bases that imply breakfast — keeps `breakfastIncluded` derivable. */
@@ -85,6 +87,8 @@ export const BOARD_INCLUDES_BREAKFAST: Record<BoardBasis, boolean> = {
   breakfast: true,
   halfBoard: true,
   fullBoard: true,
+  allInclusive: true,
+  ultraAllInclusive: true,
 };
 
 export const CURRENCIES = [

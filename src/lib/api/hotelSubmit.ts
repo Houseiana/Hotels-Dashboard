@@ -88,6 +88,24 @@ async function toFile(dataUrl: string, name: string): Promise<File | undefined> 
   }
 }
 
+/**
+ * A photo list split the way every write endpoint wants it: the first photo is
+ * the cover, the rest the gallery.
+ *
+ * Gradient placeholders are not files and drop out on the way — the server can
+ * only be sent what an owner actually uploaded.
+ */
+async function splitPhotos(
+  photos: readonly string[],
+  prefix: string,
+): Promise<{ coverFile?: File; photoFiles: File[] }> {
+  const [cover, ...rest] = photos;
+  const coverFile = cover ? await toFile(cover, `${prefix}-cover`) : undefined;
+  const photoFiles = (
+    await Promise.all(rest.map((photo, index) => toFile(photo, `${prefix}-${index + 1}`)))
+  ).filter((file): file is File => Boolean(file));
+  return { coverFile, photoFiles };
+}
 
 /**
  * The children policy in the API's own terms.
@@ -174,58 +192,58 @@ export async function draftToCreatePayload(
 
   const currencyId = lookups.currencies?.find((c) => c.code === draft.currency)?.id;
 
-  const roomTypes: HotelRoomTypePayload[] = draft.roomTypes.map((room) => {
-    const ratePlans: RatePlanPayload[] = room.ratePlans.flatMap((plan) => {
-      const board = boardId(plan.boardBasis);
-      const price = num(plan.pricePerNight);
-      // The API requires both; a plan missing either is not a plan yet.
-      if (board === undefined || price === undefined) return [];
+  const roomTypes: HotelRoomTypePayload[] = await Promise.all(
+    draft.roomTypes.map(async (room, roomIndex) => {
+      const ratePlans: RatePlanPayload[] = room.ratePlans.flatMap((plan) => {
+        const board = boardId(plan.boardBasis);
+        const price = num(plan.pricePerNight);
+        // The API requires both; a plan missing either is not a plan yet.
+        if (board === undefined || price === undefined) return [];
 
-      // The wizard offers presets; the API wants a policy type plus a window.
-      // The owner's actual choice, not a guess reconstructed from a boolean.
-      const preset = plan.cancellation || (plan.refundable ? 'free24h' : 'nonRefundable');
-      const rule = CANCELLATION_RULES[preset];
+        // The wizard offers presets; the API wants a policy type plus a window.
+        // The owner's actual choice, not a guess reconstructed from a boolean.
+        const preset = plan.cancellation || (plan.refundable ? 'free24h' : 'nonRefundable');
+        const rule = CANCELLATION_RULES[preset];
 
-      return [
-        {
-          boardBasis: board,
-          basePrice: price,
-          currencyId,
-          cancellationPolicyType: policyId(preset),
-          freeCancellationHours: rule?.freeCancellationHours,
-          freeCancellationDays: rule?.freeCancellationDays,
-        },
-      ];
-    });
+        return [
+          {
+            boardBasis: board,
+            basePrice: price,
+            currencyId,
+            cancellationPolicyType: policyId(preset),
+            freeCancellationHours: rule?.freeCancellationHours,
+            freeCancellationDays: rule?.freeCancellationDays,
+          },
+        ];
+      });
 
-    return {
-      name: room.name.trim(),
-      nameAr: text(room.nameAr),
-      description: text(room.description),
-      descriptionAr: text(room.descriptionAr),
-      roomCategory: categoryId(room.category),
-      viewType: viewId(room.view),
-      sizeSqm: num(room.sizeM2),
-      baseOccupancy: num(room.capacity),
-      totalUnits: num(room.inventory) ?? 1,
-      beds: parseBedConfig(room.bedConfig).flatMap((bed) => {
-        const type = bedId(bed.type);
-        return type === undefined ? [] : [{ bedType: type, count: bed.qty }];
-      }),
-      amenityIds: room.amenities.flatMap((slug) => {
-        const id = roomAmenityId(slug);
-        return id === undefined ? [] : [id];
-      }),
-      services: serviceRows(room.services),
-      ratePlans,
+      return {
+        name: room.name.trim(),
+        nameAr: text(room.nameAr),
+        description: text(room.description),
+        descriptionAr: text(room.descriptionAr),
+        roomCategory: categoryId(room.category),
+        viewType: viewId(room.view),
+        sizeSqm: num(room.sizeM2),
+        baseOccupancy: num(room.capacity),
+        totalUnits: num(room.inventory) ?? 1,
+        beds: parseBedConfig(room.bedConfig).flatMap((bed) => {
+          const type = bedId(bed.type);
+          return type === undefined ? [] : [{ bedType: type, count: bed.qty }];
+        }),
+        amenityIds: room.amenities.flatMap((slug) => {
+          const id = roomAmenityId(slug);
+          return id === undefined ? [] : [id];
+        }),
+        services: serviceRows(room.services),
+        ratePlans,
+        // A room's own cover and gallery, sent alongside the hotel's own.
+        ...(await splitPhotos(room.photos, `room-${roomIndex + 1}`)),
     };
-  });
+    }),
+  );
 
-  const [cover, ...rest] = draft.photos;
-  const coverFile = cover ? await toFile(cover, 'cover') : undefined;
-  const photoFiles = (
-    await Promise.all(rest.map((photo, index) => toFile(photo, `photo-${index + 1}`)))
-  ).filter((file): file is File => Boolean(file));
+  const hotelPhotos = await splitPhotos(draft.photos, 'photo');
 
   return {
     managerId,
@@ -251,8 +269,8 @@ export async function draftToCreatePayload(
     policies: draft.houseRules,
     services: serviceRows(draft.services),
     childrenPolicy: childrenPolicyPayload(draft, lookups),
-    cover: coverFile,
-    photos: photoFiles,
+    cover: hotelPhotos.coverFile,
+    photos: hotelPhotos.photoFiles,
   };
 }
 

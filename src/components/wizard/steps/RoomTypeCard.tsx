@@ -38,6 +38,7 @@ import {
   type BedRow,
 } from '@/lib/utils';
 import { useWizard } from '../WizardProvider';
+import { PhotoGrid } from './PhotoGrid';
 import { RatePlanTable } from './RatePlanTable';
 import { ServicesEditor } from './ServicesEditor';
 
@@ -436,6 +437,19 @@ export function RoomTypeCard({
               />
             </Field>
           </Grid2>
+          </RoomSection>
+
+          <RoomSection title={t('sectionPhotos')} hint={t('sectionPhotosHint')}>
+          {/* A room type has its own cover and gallery on the API, separate
+              from the hotel's — the first photo here is that room's cover. */}
+          <PhotoGrid
+            size="sm"
+            photos={room.photos}
+            onChange={(photos) => updateRoom(index, { photos })}
+          />
+          <p className="text-[11.5px] text-faint">
+            {room.photos.length === 0 ? t('photosEmpty') : t('photosHint')}
+          </p>
           </RoomSection>
 
           <RoomSection title={t('sectionSelling')} hint={t('sectionSellingHint')}>

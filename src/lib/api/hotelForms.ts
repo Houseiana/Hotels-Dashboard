@@ -43,6 +43,16 @@ export type HotelRoomTypePayload = {
   amenityIds?: number[];
   ratePlans?: RatePlanPayload[];
   services?: ServicePayload[];
+  /**
+   * A room type's OWN cover and gallery, separate from the hotel's.
+   *
+   * The OpenAPI document does not show these — the room-type collection is
+   * documented as JSON — but the endpoint binds them like every other nested
+   * file: `roomTypes[0].coverFile` and repeated `roomTypes[0].photoFiles`.
+   * Note the names differ from the hotel's own `cover` / `photos`.
+   */
+  coverFile?: File;
+  photoFiles?: File[];
 };
 
 export type CreateHotelPayload = {
@@ -174,6 +184,8 @@ function writeRoomType(form: FormData, prefix: string, room: HotelRoomTypePayloa
   putObjects(form, `${prefix}.beds`, room.beds, writeBed);
   putObjects(form, `${prefix}.ratePlans`, room.ratePlans, writeRatePlan);
   putObjects(form, `${prefix}.services`, room.services, writeService);
+  put(form, `${prefix}.coverFile`, room.coverFile);
+  putAll(form, `${prefix}.photoFiles`, room.photoFiles);
 }
 
 /** Fields shared by the create and edit forms. */
