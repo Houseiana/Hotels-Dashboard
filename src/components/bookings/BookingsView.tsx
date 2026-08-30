@@ -6,8 +6,10 @@ import {
   BedDouble,
   CalendarRange,
   Info,
+  Loader2,
   Mail,
   MapPin,
+  Phone,
   Search,
   Users,
 } from 'lucide-react';
@@ -22,7 +24,7 @@ import {
 import { Select, TextInput } from '@/components/ui/form';
 import { Drawer } from '@/components/ui/overlay';
 import { useHotelScope } from '@/components/providers/HotelScopeProvider';
-import { useBookingsScreen, type BookingRow } from '@/lib/query/hooks';
+import { useBookingDetail, useBookingsScreen, type BookingRow } from '@/lib/query/hooks';
 import { useLookup } from '@/lib/query/lookups';
 import { useCatalogLabels } from '@/lib/useLabels';
 import { bookingStatusSlug } from '@/lib/schemas/hotelApi';
@@ -60,6 +62,11 @@ export function BookingsView() {
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<BookingRow | null>(null);
+
+  // The row opens the drawer instantly; the per-booking endpoint fills in
+  // whatever the list row does not carry.
+  const detail = useBookingDetail(selected);
+  const booking = detail.data;
 
   // Same reason as the Reviews screen: a hotel switch is a new result set, so
   // the page number cannot carry over.
@@ -317,14 +324,14 @@ export function BookingsView() {
       <Drawer
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
-        title={selected ? t('detailTitle', { reference: selected.reference || '—' }) : ''}
+        title={booking ? t('detailTitle', { reference: booking.reference || '—' }) : ''}
         subtitle={
-          selected ? (
+          booking ? (
             <span className="flex items-center gap-2">
-              <StatusChip booking={selected} label={labels.bookingStatus} />
-              {selected.createdAt ? (
+              <StatusChip booking={booking} label={labels.bookingStatus} />
+              {booking.createdAt ? (
                 <span className="latn">
-                  {t('bookedOn', { date: formatDate(selected.createdAt, locale) })}
+                  {t('bookedOn', { date: formatDate(booking.createdAt, locale) })}
                 </span>
               ) : null}
             </span>
@@ -341,26 +348,42 @@ export function BookingsView() {
           ) : null
         }
       >
-        {selected ? (
+        {booking ? (
           <div className="flex flex-col gap-4">
+            {/* The row is already on screen while the per-booking call is in
+                flight — only the extra detail is still missing, so this is a
+                thin line rather than a skeleton over content we have. */}
+            {detail.isPending ? (
+              <p className="flex items-center gap-2 text-[12px] text-muted">
+                <Loader2 className="size-3.5 animate-spin" />
+                {tCommon('loading')}
+              </p>
+            ) : null}
+
             <section className="flex flex-col gap-2">
               <h3 className="text-[11px] font-bold uppercase tracking-[.06em] text-faint">
                 {t('detailGuest')}
               </h3>
-              <p className="text-[15px] font-semibold text-ink">{selected.guestName || '—'}</p>
-              {selected.guestEmail ? (
+              <p className="text-[15px] font-semibold text-ink">{booking.guestName || '—'}</p>
+              {booking.guestEmail ? (
                 <p className="flex items-center gap-2 text-[13px] text-muted latn">
                   <Mail className="size-3.5" />
-                  {selected.guestEmail}
+                  {booking.guestEmail}
                 </p>
               ) : null}
-              {selected.guests !== undefined || selected.guestCountry ? (
+              {booking.guestPhone ? (
+                <p className="flex items-center gap-2 text-[13px] text-muted latn">
+                  <Phone className="size-3.5" />
+                  {booking.guestPhone}
+                </p>
+              ) : null}
+              {booking.guests !== undefined || booking.guestCountry ? (
                 <p className="flex items-center gap-2 text-[13px] text-muted">
                   <Users className="size-3.5" />
-                  {selected.guests !== undefined
-                    ? tCommon('guests', { count: selected.guests })
+                  {booking.guests !== undefined
+                    ? tCommon('guests', { count: booking.guests })
                     : ''}
-                  {selected.guestCountry ? ` · ${selected.guestCountry}` : ''}
+                  {booking.guestCountry ? ` · ${booking.guestCountry}` : ''}
                 </p>
               ) : null}
             </section>
@@ -373,18 +396,18 @@ export function BookingsView() {
               </h3>
               <p className="flex items-center gap-2 text-[13.5px] text-ink latn">
                 <CalendarRange className="size-4 text-faint" />
-                {selected.checkIn ? formatDate(selected.checkIn, locale) : '—'} →{' '}
-                {selected.checkOut ? formatDate(selected.checkOut, locale) : '—'}
+                {booking.checkIn ? formatDate(booking.checkIn, locale) : '—'} →{' '}
+                {booking.checkOut ? formatDate(booking.checkOut, locale) : '—'}
               </p>
-              {selected.nights !== undefined ? (
+              {booking.nights !== undefined ? (
                 <p className="text-[12.5px] text-muted">
-                  {tCommon('nights', { count: selected.nights })}
+                  {tCommon('nights', { count: booking.nights })}
                 </p>
               ) : null}
-              {selected.hotelName ? (
+              {booking.hotelName ? (
                 <p className="flex items-center gap-2 text-[13px] text-muted">
                   <MapPin className="size-3.5" />
-                  {selected.hotelName}
+                  {booking.hotelName}
                 </p>
               ) : null}
             </section>
@@ -397,11 +420,11 @@ export function BookingsView() {
               </h3>
               <p className="flex items-center gap-2 text-[13.5px] text-ink">
                 <BedDouble className="size-4 text-faint" />
-                {selected.roomTypeName || '—'}
+                {booking.roomTypeName || '—'}
               </p>
-              {selected.boardBasis ? (
+              {booking.boardBasis ? (
                 <div className="flex flex-wrap gap-1.5">
-                  <Chip tone="neutral">{labels.boardBasis(selected.boardBasis)}</Chip>
+                  <Chip tone="neutral">{labels.boardBasis(booking.boardBasis)}</Chip>
                 </div>
               ) : null}
             </section>
@@ -413,11 +436,11 @@ export function BookingsView() {
                 {t('detailPayment')}
               </h3>
               <p className={cn('text-[19px] font-bold tracking-[-.02em] text-ink latn')}>
-                {formatMoney(selected.total ?? undefined, selected.currency, locale)}
+                {formatMoney(booking.total ?? undefined, booking.currency, locale)}
               </p>
             </section>
 
-            {selected.note ? (
+            {booking.note ? (
               <>
                 <div className="h-px bg-line" />
                 <section className="flex flex-col gap-1.5">
@@ -425,7 +448,7 @@ export function BookingsView() {
                     {t('detailNote')}
                   </h3>
                   <p className="rounded-[var(--radius-ctl)] bg-surface-2 p-3 text-[13px] text-muted">
-                    {selected.note}
+                    {booking.note}
                   </p>
                 </section>
               </>

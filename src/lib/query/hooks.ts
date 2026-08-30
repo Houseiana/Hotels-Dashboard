@@ -472,6 +472,7 @@ export type BookingRow = {
   roomTypeName: string;
   guestName: string;
   guestEmail?: string;
+  guestPhone?: string;
   guestCountry?: string;
   guests?: number;
   checkIn: string;
@@ -511,13 +512,16 @@ function fromApiBookingRow(booking: ApiBooking, hotelNames: Map<string, string>)
   const slug = bookingStatusSlug(statusName);
   const hotelId = booking.hotelId ?? '';
   return {
-    id: booking.id ?? booking.bookingId ?? booking.reference ?? '',
-    reference: booking.reference ?? booking.bookingReference ?? '',
+    id: booking.bookingId ?? booking.id ?? booking.bookingCode ?? '',
+    // The API's own name for the reference is `bookingCode`; the other two are
+    // kept as fallbacks only.
+    reference: booking.bookingCode ?? booking.reference ?? booking.bookingReference ?? '',
     hotelId,
     hotelName: booking.hotelName ?? hotelNames.get(hotelId) ?? '',
     roomTypeName: booking.roomTypeName ?? '',
     guestName: booking.guestName ?? '',
     guestEmail: booking.guestEmail ?? undefined,
+    guestPhone: booking.guestPhone ?? undefined,
     guestCountry: booking.guestCountry ?? undefined,
     guests: booking.guests ?? undefined,
     checkIn: booking.checkIn ?? '',
@@ -527,10 +531,11 @@ function fromApiBookingRow(booking: ApiBooking, hotelNames: Map<string, string>)
     statusLabel: slug ? null : statusName,
     tone: slug ? BOOKING_STATUS_TONE[slug] : 'neutral',
     boardBasis: booking.boardBasis ?? undefined,
-    total: booking.total ?? booking.totalAmount ?? null,
+    // Likewise `totalPrice` is the field the API actually sends.
+    total: booking.totalPrice ?? booking.total ?? booking.totalAmount ?? null,
     currency: booking.currencyCode ?? DEFAULT_CURRENCY,
     createdAt: booking.createdAt ?? undefined,
-    note: booking.specialRequests ?? undefined,
+    note: booking.specialRequests ?? booking.notes ?? undefined,
   };
 }
 
@@ -633,6 +638,49 @@ export function useBookingsScreen(
   }, [ready, mock.data, query.data, hotelId, hotelNames]);
 
   return { data, isPending, isError };
+}
+
+/**
+ * `GET /api/hotels/bookings/{bookingId}` for the drawer.
+ *
+ * The row the drawer was opened from is passed in and returned immediately, so
+ * the panel is never blank; anything the detail call adds is
+ * merged over it when it arrives. Only fields the detail actually sends win —
+ * a missing one keeps the row's value rather than blanking it.
+ */
+export function useBookingDetail(
+  row: BookingRow | null,
+): { data: BookingRow | null; isPending: boolean; isError: boolean } {
+  const id = row?.id ?? '';
+
+  const query = useQuery({
+    queryKey: queryKeys.bookings.detail(id),
+    queryFn: () => bookingsApi.get(id),
+    enabled: Boolean(id) && !USE_MOCK,
+  });
+
+  const data = useMemo<BookingRow | null>(() => {
+    if (!row) return null;
+    if (!query.data) return row;
+    const detail = fromApiBookingRow(query.data, new Map());
+    const merged = { ...row };
+    for (const [key, value] of Object.entries(detail) as Array<
+      [keyof BookingRow, BookingRow[keyof BookingRow]]
+    >) {
+      if (value === undefined || value === null || value === '') continue;
+      Object.assign(merged, { [key]: value });
+    }
+    // `status` is derived, so its label and tone have to travel with it rather
+    // than being merged field by field.
+    if (detail.status || detail.statusLabel) {
+      merged.status = detail.status;
+      merged.statusLabel = detail.statusLabel;
+      merged.tone = detail.tone;
+    }
+    return merged;
+  }, [row, query.data]);
+
+  return { data, isPending: Boolean(id) && !USE_MOCK && query.isPending, isError: query.isError };
 }
 
 /* -- pricing & availability ------------------------------------------------ */

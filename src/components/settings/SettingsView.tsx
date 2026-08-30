@@ -12,15 +12,7 @@ import {
   PageHeader,
   Skeleton,
 } from '@/components/ui/primitives';
-import {
-  Field,
-  Grid2,
-  Select,
-  TextArea,
-  TextInput,
-  TimeInput,
-  Toggle,
-} from '@/components/ui/form';
+import { Field, Grid2, Select, TextInput } from '@/components/ui/form';
 import {
   useDeletePayoutMethod,
   usePayoutMethods,
@@ -31,7 +23,7 @@ import {
 import { useCurrencyLookup, useLookup } from '@/lib/query/lookups';
 import { ConfirmDialog } from '@/components/ui/overlay';
 import type { PayoutMethodInput } from '@/lib/api/settings';
-import type { PayoutMethodRecord } from '@/lib/schemas/hotelApi';
+import { payoutMethodOption, type PayoutMethodRecord } from '@/lib/schemas/hotelApi';
 import { useToast } from '@/components/providers/ToastProvider';
 import { useCatalogLabels } from '@/lib/useLabels';
 import { CURRENCIES } from '@/lib/catalogs';
@@ -40,10 +32,10 @@ import { issueMap, validate } from '@/lib/schemas/errors';
 import { AUTH_IS_MOCKED } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
-type Tab = 'account' | 'payout' | 'policies';
+type Tab = 'account' | 'payout';
 
 /** The fields the page's Save button is responsible for. */
-const formSchema = settingsSchema.pick({ account: true, defaultPolicies: true });
+const formSchema = settingsSchema.pick({ account: true });
 
 export function SettingsView() {
   const t = useTranslations('settings');
@@ -81,9 +73,6 @@ function SettingsForm({ initial }: { initial: Settings }) {
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
-  // The policy labels are owned by the wizard's Basics step — reused verbatim
-  // so the defaults screen and the per-hotel screen never drift apart.
-  const tBasics = useTranslations('wizard.basics');
   const labels = useCatalogLabels();
   const toast = useToast();
   const save = useSaveSettings();
@@ -104,20 +93,14 @@ function SettingsForm({ initial }: { initial: Settings }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const submit = () => {
-    // Only the two tabs this button owns. `payout` is still part of the stored
-    // Settings shape for the mock store, but the payout tab manages its own
-    // records through their endpoints — validating it here would block every
-    // save with errors for fields the form no longer shows.
-    const result = validate(formSchema, {
-      account: form.account,
-      defaultPolicies: form.defaultPolicies,
-    });
+    // Only the Account tab. The per-hotel defaults tab is gone — those values
+    // are edited on the hotel itself now — and `payout` manages its own records
+    // through their endpoints, so validating either here would block every save
+    // with errors for fields the form no longer shows.
+    const result = validate(formSchema, { account: form.account });
     if (!result.ok) {
       setErrors(issueMap(result.issues));
-      // Jump to the tab that actually holds the problem.
-      const first = result.issues[0]?.segments[0];
-      if (first === 'account') setTab('account');
-      else if (first === 'defaultPolicies') setTab('policies');
+      setTab('account');
       return;
     }
     setErrors({});
@@ -129,13 +112,10 @@ function SettingsForm({ initial }: { initial: Settings }) {
 
   const setAccount = (patch: Partial<Settings['account']>) =>
     setForm({ ...form, account: { ...form.account, ...patch } });
-  const setPolicies = (patch: Partial<Settings['defaultPolicies']>) =>
-    setForm({ ...form, defaultPolicies: { ...form.defaultPolicies, ...patch } });
 
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'account', label: t('tabAccount') },
     { id: 'payout', label: t('tabPayout') },
-    { id: 'policies', label: t('tabPolicies') },
   ];
 
   return (
@@ -259,71 +239,6 @@ function SettingsForm({ initial }: { initial: Settings }) {
       ) : null}
 
       {tab === 'payout' ? <PayoutTab /> : null}
-
-      {tab === 'policies' ? (
-        <Card>
-          <CardHeader title={t('policiesTitle')} hint={t('policiesSubtitle')} />
-          <CardBody>
-            <Grid2>
-              <Field
-                label={tBasics('checkIn')}
-                error={labels.validation(errors['defaultPolicies.checkInFrom'])}
-              >
-                <TimeInput
-                  value={form.defaultPolicies.checkInFrom ?? ''}
-                  onChange={(e) => setPolicies({ checkInFrom: e.target.value })}
-                />
-              </Field>
-              <Field
-                label={tBasics('checkOut')}
-                error={labels.validation(errors['defaultPolicies.checkOutUntil'])}
-              >
-                <TimeInput
-                  value={form.defaultPolicies.checkOutUntil ?? ''}
-                  onChange={(e) => setPolicies({ checkOutUntil: e.target.value })}
-                />
-              </Field>
-            </Grid2>
-
-            <Field label={tBasics('cancellation')}>
-              <TextInput
-                value={form.defaultPolicies.cancellation ?? ''}
-                onChange={(e) => setPolicies({ cancellation: e.target.value })}
-              />
-            </Field>
-
-            <Grid2>
-              <Field label={tBasics('childrenPolicy')}>
-                <TextArea
-                  value={form.defaultPolicies.childrenPolicy ?? ''}
-                  onChange={(e) => setPolicies({ childrenPolicy: e.target.value })}
-                  className="min-h-[64px]"
-                />
-              </Field>
-              <Field label={tBasics('paymentNote')}>
-                <TextArea
-                  value={form.defaultPolicies.paymentNote ?? ''}
-                  onChange={(e) => setPolicies({ paymentNote: e.target.value })}
-                  className="min-h-[64px]"
-                />
-              </Field>
-            </Grid2>
-
-            <Grid2>
-              <Toggle
-                checked={form.defaultPolicies.petsAllowed ?? false}
-                onChange={(v) => setPolicies({ petsAllowed: v })}
-                label={tBasics('petsAllowed')}
-              />
-              <Toggle
-                checked={form.defaultPolicies.smokingAllowed ?? false}
-                onChange={(v) => setPolicies({ smokingAllowed: v })}
-                label={tBasics('smokingAllowed')}
-              />
-            </Grid2>
-          </CardBody>
-        </Card>
-      ) : null}
     </div>
   );
 }
@@ -367,7 +282,8 @@ function PayoutTab() {
 
   const startEdit = (record: PayoutMethodRecord) => {
     setDraft({
-      payoutMethodId: record.payoutMethodId ?? options[0]?.id ?? 0,
+      // The list answers with the enum's name, the DTO wants its integer id.
+      payoutMethodId: payoutMethodOption(record.payoutMethodId, options)?.id ?? options[0]?.id ?? 0,
       accountId: record.accountId ?? '',
       accountName: record.accountName ?? '',
     });
@@ -407,6 +323,10 @@ function PayoutTab() {
       <CardBody>
         {saved.isPending ? (
           <Skeleton className="h-24" />
+        ) : saved.isError ? (
+          // Without this a rejected list rendered as the empty state, so saved
+          // methods looked deleted.
+          <p className="text-[13px] text-danger">{tCommon('somethingWentWrong')}</p>
         ) : (saved.data ?? []).length === 0 && editing === null ? (
           <p className="text-[13px] text-muted">{t('payoutEmpty')}</p>
         ) : (
@@ -422,7 +342,7 @@ function PayoutTab() {
                   </span>
                   <span className="text-[11.5px] text-faint latn">
                     {record.payoutMethodName ??
-                      options.find((option) => option.id === record.payoutMethodId)?.name ??
+                      payoutMethodOption(record.payoutMethodId, options)?.name ??
                       ''}
                     {record.accountId ? ` · ${record.accountId}` : ''}
                   </span>

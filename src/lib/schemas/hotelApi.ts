@@ -360,22 +360,51 @@ export const managerAccountSchema = z.object({
 });
 
 /**
- * `GET /api/hotels/account/payout-methods`.
+ * `GET /api/hotels/account/payout-methods`. Verified against the live API:
  *
- * The account this was built against has none saved, so the field names beyond
- * the create DTO's three are unconfirmed — hence the lenient parse. `accountId`
- * is the API's single account identifier: it holds the IBAN for a bank account
- * and the address for PayPal, so the dashboard labels it by method.
+ *   { id: 14, userId, payoutMethodId: "PAYPAL", accountId, accountName }
+ *
+ * Two of these shapes are NOT the ones the create DTO takes, and getting them
+ * wrong failed the whole array parse — which the screen then rendered as "no
+ * payout method saved yet", hiding methods that were really there:
+ *
+ *   - `id` comes back as a NUMBER, while the edit and delete paths take it as a
+ *     path segment. It is normalised to a string so the rest of the dashboard
+ *     has one type to hold.
+ *   - `payoutMethodId` comes back as the enum's NAME ("PAYPAL"), not the integer
+ *     id the create/edit DTO expects. It is resolved against the PayoutMethod
+ *     lookup by name — see `payoutMethodOption`.
+ *
+ * `accountId` is the API's single account identifier: it holds the IBAN for a
+ * bank account and the address for PayPal, so the dashboard labels it by method.
  */
 export const payoutMethodRecordSchema = z
   .object({
-    id: z.string(),
-    payoutMethodId: z.number().nullable().optional(),
+    id: z.union([z.string(), z.number()]).transform(String),
+    payoutMethodId: z.union([z.string(), z.number()]).nullable().optional(),
     payoutMethodName: z.string().nullable().optional(),
     accountId: z.string().nullable().optional(),
     accountName: z.string().nullable().optional(),
   })
   .loose();
+
+/**
+ * Matches a record's `payoutMethodId` — an integer id OR an enum name — to its
+ * entry in the PayoutMethod lookup, so the list can name the method and the
+ * edit form can preselect it. Names are compared without case or separators, so
+ * "Bank Account" and "BANK_ACCOUNT" are the same method.
+ */
+export function payoutMethodOption<T extends { id: number; name: string }>(
+  value: string | number | null | undefined,
+  options: readonly T[],
+): T | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (typeof value === 'number') return options.find((option) => option.id === value);
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return options.find((option) => option.id === Number(trimmed));
+  const key = trimmed.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  return options.find((option) => option.name.replace(/[^a-z0-9]/gi, '').toLowerCase() === key);
+}
 
 export type ManagerAccount = z.infer<typeof managerAccountSchema>;
 export type PayoutMethodRecord = z.infer<typeof payoutMethodRecordSchema>;
@@ -383,17 +412,23 @@ export type PayoutMethodRecord = z.infer<typeof payoutMethodRecordSchema>;
 /* -- bookings -------------------------------------------------------------- */
 
 /**
- * `GET /api/hotels/{hotelId}/bookings`.
+ * `GET /api/hotels/bookings`. The list row, now confirmed against a live
+ * account that actually has a booking:
  *
- * The account this was built against has no bookings, so — like the review and
- * overview shapes — the fields are inferred rather than observed and every one
- * is optional. Alternative spellings the backend might use are accepted where
- * they are cheap to allow, and unknown keys are preserved.
+ *   { bookingId, bookingCode, guestName, guests, hotelName, roomTypeName,
+ *     checkIn, checkOut, nights, status, totalPrice, currencyCode }
+ *
+ * Two names differ from what was inferred before, and both were showing as an
+ * em dash in the table: the reference is `bookingCode` (not `reference`) and
+ * the money is `totalPrice` (not `total`). The earlier guesses are kept as
+ * fallbacks rather than swapped out, so nothing breaks if the backend ever
+ * answers with them. Everything stays optional and unknown keys are preserved.
  */
 export const apiBookingSchema = z
   .object({
     id: z.string().optional(),
     bookingId: z.string().nullable().optional(),
+    bookingCode: z.string().nullable().optional(),
     reference: z.string().nullable().optional(),
     bookingReference: z.string().nullable().optional(),
     hotelId: z.string().nullable().optional(),
@@ -402,6 +437,7 @@ export const apiBookingSchema = z
     roomTypeName: z.string().nullable().optional(),
     guestName: z.string().nullable().optional(),
     guestEmail: z.string().nullable().optional(),
+    guestPhone: z.string().nullable().optional(),
     guestCountry: z.string().nullable().optional(),
     guests: z.number().nullable().optional(),
     checkIn: z.string().nullable().optional(),
@@ -412,9 +448,11 @@ export const apiBookingSchema = z
     boardBasis: z.string().nullable().optional(),
     total: z.number().nullable().optional(),
     totalAmount: z.number().nullable().optional(),
+    totalPrice: z.number().nullable().optional(),
     currencyCode: z.string().nullable().optional(),
     createdAt: z.string().nullable().optional(),
     specialRequests: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
   })
   .loose();
 

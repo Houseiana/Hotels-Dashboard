@@ -54,6 +54,25 @@ export const bookingsApi = {
     return { items: data, pagination };
   },
 
+  /**
+   * `GET /api/hotels/bookings/{bookingId}` — the one booking, on its own.
+   *
+   * The drawer used to render nothing but the row it was opened from, so
+   * opening a booking showed exactly what the table already showed. It calls
+   * this now and merges the answer over the row.
+   *
+   * Parsed with the list's own schema: it is `.loose()`, so any field the
+   * detail adds survives, and the fields the drawer knows how to render are
+   * picked up without guessing at names that have not been observed.
+   */
+  async get(bookingId: string): Promise<ApiBooking> {
+    const { data } = await requestData(
+      `/api/hotels/bookings/${bookingId}`,
+      apiBookingSchema,
+    );
+    return data;
+  },
+
   /* -- NOT AVAILABLE ---------------------------------------------------------
    * HotelManagement has no booking status endpoint — no confirm, no cancel, no
    * check-in. This stays on the mock so that mode keeps working; the real

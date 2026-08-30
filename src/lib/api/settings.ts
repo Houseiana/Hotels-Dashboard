@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { Settings } from '../schemas/booking';
-import type { HotelPolicies } from '../schemas/hotel';
 import {
   managerAccountSchema,
   payoutMethodRecordSchema,
@@ -13,11 +12,14 @@ import { DEFAULT_CURRENCY } from '../catalogs';
 /* ---------------------------------------------------------------------------
  * `GET/POST /api/hotels/account` and the payout-method endpoints.
  *
- * Two of this screen's fields have no home on the server: the dashboard's
- * display language and the default check-in/out times used to seed new hotels.
- * Both are preferences of this browser rather than account data, so they are
- * stored locally and merged in here — the alternative is showing fields that
- * silently forget what you typed.
+ * One of this screen's fields has no home on the server: the dashboard's
+ * display language. It is a preference of this browser rather than account
+ * data, so it is stored locally and merged in here — the alternative is showing
+ * a field that silently forgets what you chose.
+ *
+ * There used to be a second one, a set of default policies used to seed new
+ * hotels. Policies are edited on the hotel itself now, so that tab is gone and
+ * nothing is stored for it.
  *
  * Payout methods are a LIST on the server with their own create, edit and
  * delete calls, so they are NOT part of `save()`; the screen manages them one
@@ -28,25 +30,13 @@ const LOCAL_KEY = 'houseiana.settings.local';
 
 type LocalPreferences = {
   defaultLocale: 'en' | 'ar';
-  defaultPolicies: HotelPolicies;
 };
 
 const localSchema = z.object({
   defaultLocale: z.enum(['en', 'ar']),
-  defaultPolicies: z.object({
-    checkInFrom: z.string().optional(),
-    checkOutUntil: z.string().optional(),
-    cancellationPolicy: z.string().optional(),
-    childrenAllowed: z.boolean().optional(),
-    petsAllowed: z.boolean().optional(),
-    smokingAllowed: z.boolean().optional(),
-  }),
 });
 
-const FALLBACK: LocalPreferences = {
-  defaultLocale: 'en',
-  defaultPolicies: { checkInFrom: '15:00', checkOutUntil: '12:00' },
-};
+const FALLBACK: LocalPreferences = { defaultLocale: 'en' };
 
 function readLocal(): LocalPreferences {
   if (typeof window === 'undefined') return FALLBACK;
@@ -91,7 +81,9 @@ export const settingsApi = {
         iban: '',
         payoutCurrency: data.currencyCode || DEFAULT_CURRENCY,
       },
-      defaultPolicies: local.defaultPolicies,
+      // Kept only to satisfy the stored Settings shape; the screen no longer
+      // shows or writes them.
+      defaultPolicies: {},
     };
   },
 
@@ -113,10 +105,7 @@ export const settingsApi = {
       },
     });
 
-    writeLocal({
-      defaultLocale: settings.account.defaultLocale,
-      defaultPolicies: settings.defaultPolicies,
-    });
+    writeLocal({ defaultLocale: settings.account.defaultLocale });
 
     return settings;
   },
