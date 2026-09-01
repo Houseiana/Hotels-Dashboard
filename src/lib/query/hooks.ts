@@ -15,10 +15,11 @@ import { payoutApi, settingsApi, type PayoutMethodInput } from '../api/settings'
 import { overviewApi } from '../api/overview';
 import { feesApi, type HotelFeeInput } from '../api/fees';
 import { reviewsApi, type ReviewsQuery, type ReviewsResult } from '../api/reviews';
-import { useCurrencyLookup } from './lookups';
+import { useCurrencyLookup, useLookup } from './lookups';
 import { USE_MOCK } from '../api/config';
 import { queryKeys } from './keys';
 import { BOARD_NAMES, CATEGORY_NAMES } from '../api/catalogMap';
+import { apiToNearbyPlace } from '../api/nearbyPlaces';
 import type { Hotel, HotelNearbyPlace, HotelReview } from '../schemas/hotel';
 import {
   bookingStatusSlug,
@@ -208,17 +209,29 @@ export function useDeleteHotel(): UseMutationResult<void, Error, string> {
   });
 }
 
-export function useNearbyPlaces(
-  latitude: number | undefined,
-  longitude: number | undefined,
-  locale: string,
+/**
+ * A hotel's nearby places, in the wizard's shape.
+ *
+ * These used to be invented from the map pin. They are the owner's own rows
+ * now, so this reads them back from the API — one call per category, because
+ * the endpoint refuses to answer without a `categoryId` (see hotelsApi).
+ */
+export function useHotelNearbyPlaces(
+  hotelId: string | undefined,
 ): UseQueryResult<HotelNearbyPlace[]> {
+  const categories = useLookup('nearbyCategories');
+  const categoryIds = useMemo(
+    () => (categories.data ?? []).map((item) => item.id),
+    [categories.data],
+  );
+
   return useQuery({
-    queryKey: queryKeys.places.nearby(latitude ?? 0, longitude ?? 0, locale),
-    queryFn: () => hotelsApi.nearby(latitude as number, longitude as number, locale),
-    enabled: latitude !== undefined && longitude !== undefined,
-    // A pin's surroundings don't change during an editing session.
-    staleTime: Infinity,
+    queryKey: queryKeys.places.forHotel(hotelId ?? ''),
+    queryFn: async () => {
+      const places = await hotelsApi.nearbyPlaces(hotelId as string, categoryIds);
+      return places.map((place) => apiToNearbyPlace(place));
+    },
+    enabled: Boolean(hotelId) && categoryIds.length > 0 && !USE_MOCK,
   });
 }
 

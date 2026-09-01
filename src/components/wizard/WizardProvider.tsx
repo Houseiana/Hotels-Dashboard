@@ -22,7 +22,7 @@ import {
 } from '@/lib/schemas/draft';
 import { hotelSchema, type Hotel } from '@/lib/schemas/hotel';
 import { collectIssues, issueMap, validate, type FieldIssue } from '@/lib/schemas/errors';
-import { useCreateHotel } from '@/lib/query/hooks';
+import { useCreateHotel, useHotelNearbyPlaces } from '@/lib/query/hooks';
 import { useLookup, useCurrencyLookup } from '@/lib/query/lookups';
 import { applyHotelEdit, type EditResult } from '@/lib/api/hotelUpdate';
 import type { HotelDetail } from '@/lib/schemas/hotelApi';
@@ -30,6 +30,7 @@ import { queryKeys } from '@/lib/query/keys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/components/providers/SessionProvider';
 import { childrenPolicyPayload, draftToCreateForm, serviceRows } from '@/lib/api/hotelSubmit';
+import { dayPlanOrders, nearbyPlacePayload, nearbyRows } from '@/lib/api/nearbyPlaces';
 import { hotelsApi } from '@/lib/api/hotels';
 import { clearDraft, loadDraft, saveDraft, NEW_DRAFT_KEY } from '@/lib/wizard/draftStore';
 import { makeId } from '@/lib/utils';
@@ -150,6 +151,10 @@ export function WizardProvider({
   const cancellationPolicyType = useLookup('cancellationPolicyType');
   const childPricingMode = useLookup('childPricingMode');
   const currencies = useCurrencyLookup();
+  /* Nearby places are written one call each, after the hotel exists. */
+  const nearbyCategories = useLookup('nearbyCategories');
+  /* What the server currently has, so an edit can diff against it. */
+  const savedNearby = useHotelNearbyPlaces(initialDetail?.id);
 
   const lookups = useMemo(
     () => ({
@@ -193,7 +198,11 @@ export function WizardProvider({
     // loss: an unresolved pricing mode would blank the children policy, and a
     // missing currency list would price a new rate plan in nothing at all.
     Boolean(lookups.childPricingMode?.length) &&
-    Boolean(lookups.currencies?.length);
+    Boolean(lookups.currencies?.length) &&
+    // A nearby place with no resolved category is rejected by the API, and the
+    // create runs after the hotel exists — so a hotel would be published with
+    // its places silently missing.
+    Boolean(nearbyCategories.data?.length);
 
   /** Which local-storage slot this wizard owns. */
   const draftKey = initialDraft?.id ?? NEW_DRAFT_KEY;
@@ -429,6 +438,21 @@ export function WizardProvider({
       }
     }
 
+    // Nearby places have no place in the create form — `nearby-places/create`
+    // is keyed by hotel id, which does not exist until the call above returns.
+    if (id) {
+      const rows = nearbyRows(latest.current.nearby);
+      const orders = dayPlanOrders(rows);
+      for (const [index, place] of rows.entries()) {
+        try {
+          await hotelsApi.createNearbyPlace(id, nearbyPlacePayload(place, orders.get(index)));
+        } catch {
+          // One place failing is not worth failing the whole publish over; the
+          // owner can add it again from the hotel's edit screen.
+        }
+      }
+    }
+
     // Only drop the local draft once the server has definitely taken it.
     clearDraft(draftKey);
     return id;
@@ -452,16 +476,25 @@ export function WizardProvider({
         latest.current,
         lookups,
         defaultCurrency ?? DEFAULT_CURRENCY,
+        { before: savedNearby.data },
       );
       // A partial failure leaves the local draft in place: it is the only copy
       // of the changes that did not reach the server.
       if (result.ok) clearDraft(draftKey);
       await queryClient.invalidateQueries({ queryKey: queryKeys.hotels.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.places.all });
       return result;
     } finally {
       setIsEditing(false);
     }
-  }, [initialDetail, lookups, defaultCurrency, draftKey, queryClient]);
+  }, [
+    initialDetail,
+    lookups,
+    defaultCurrency,
+    draftKey,
+    queryClient,
+    savedNearby.data,
+  ]);
 
   const value = useMemo<WizardContextValue>(
     () => ({

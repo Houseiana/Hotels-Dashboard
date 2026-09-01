@@ -1,41 +1,24 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
-import { useLocale, useTranslations } from 'next-intl';
-import {
-  Bus,
-  Landmark,
-  Loader2,
-  MapPin,
-  RefreshCw,
-  Sparkles,
-  UtensilsCrossed,
-} from 'lucide-react';
-import { Button, Card, CardBody, CardHeader, Chip } from '@/components/ui/primitives';
+import { useMemo, useRef } from 'react';
+import { useTranslations } from 'next-intl';
+import { MapPin } from 'lucide-react';
+import { Card, CardBody, CardHeader } from '@/components/ui/primitives';
 import { Field, Grid2, Grid3, Select, TextInput } from '@/components/ui/form';
-import { API_SUPPORTS } from '@/lib/api/capabilities';
 import { CITY_CENTERS } from '@/lib/catalogs';
 import { useCatalogLabels } from '@/lib/useLabels';
-import { useNearbyPlaces } from '@/lib/query/hooks';
 import { useCities, useLookup, useStates, useVillages } from '@/lib/query/lookups';
-import type { NearbyCategory } from '@/lib/schemas/hotel';
 import { clamp, cn } from '@/lib/utils';
 import { useWizard } from '../WizardProvider';
+import { NearbyPlacesCard } from './NearbyPlacesCard';
 import { PanelIntro } from './PanelIntro';
 
 /** Degrees of latitude/longitude covered by the map viewport. */
 const SPAN = 0.06;
 
-const CATEGORY_ICONS: Record<NearbyCategory, typeof Landmark> = {
-  attraction: Landmark,
-  restaurant: UtensilsCrossed,
-  transit: Bus,
-};
-
 export function LocationStep() {
   const t = useTranslations('wizard.location');
   const tCommon = useTranslations('common');
-  const locale = useLocale();
   const labels = useCatalogLabels();
   const { draft, update, errorsFor } = useWizard();
   const errors = errorsFor('location');
@@ -58,23 +41,6 @@ export function LocationStep() {
 
   const hasPin = typeof draft.latitude === 'number' && typeof draft.longitude === 'number';
 
-  const nearby = useNearbyPlaces(
-    hasPin ? draft.latitude : undefined,
-    hasPin ? draft.longitude : undefined,
-    locale,
-  );
-
-  /* `nearby[]` is derived, never typed: whatever the lookup returns for the
-     current pin becomes the stored value. */
-  const lastApplied = useRef<string>('');
-  useEffect(() => {
-    if (!nearby.data) return;
-    const signature = JSON.stringify(nearby.data);
-    if (signature === lastApplied.current) return;
-    lastApplied.current = signature;
-    update({ nearby: nearby.data });
-  }, [nearby.data, update]);
-
   const dropPin = (event: React.MouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const fx = (event.clientX - rect.left) / rect.width;
@@ -95,13 +61,6 @@ export function LocationStep() {
         y: clamp(0.5 - (draft.latitude! - center.lat) / SPAN, 0.02, 0.98) * 100,
       }
     : { x: 50, y: 48 };
-
-  const grouped = (['attraction', 'restaurant', 'transit'] as NearbyCategory[]).map(
-    (category) => ({
-      category,
-      items: (draft.nearby ?? []).filter((p) => p.category === category),
-    }),
-  );
 
   return (
     <>
@@ -312,79 +271,7 @@ export function LocationStep() {
         </CardBody>
       </Card>
 
-      {/* No nearby-place endpoint exists under the HotelManagement tag, so this
-          whole panel is hidden against the real API — see API_SUPPORTS. */}
-      {API_SUPPORTS.nearbyPlaces ? (
-      <Card>
-        <CardHeader
-          title={t('cardNearby')}
-          hint={
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="size-3.5" />
-              {t('nearbyAuto')}
-            </span>
-          }
-          action={
-            hasPin ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => nearby.refetch()}
-                disabled={nearby.isFetching}
-              >
-                <RefreshCw className={cn('size-3.5', nearby.isFetching && 'animate-spin')} />
-                {t('nearbyRefresh')}
-              </Button>
-            ) : null
-          }
-        />
-        <CardBody>
-          <p className="text-[12px] text-faint">{t('nearbyHint')}</p>
-
-          {!hasPin ? (
-            <p className="rounded-[var(--radius-ctl)] border border-dashed border-line-strong bg-surface-2 px-4 py-6 text-center text-[13px] text-muted">
-              {t('nearbyEmpty')}
-            </p>
-          ) : nearby.isPending || nearby.isFetching ? (
-            <p className="flex items-center justify-center gap-2 rounded-[var(--radius-ctl)] border border-dashed border-line-strong bg-surface-2 px-4 py-6 text-[13px] text-muted">
-              <Loader2 className="size-4 animate-spin" />
-              {t('nearbyLoading')}
-            </p>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <Chip tone="accent" className="self-start">
-                {t('nearbyCount', { count: draft.nearby?.length ?? 0 })}
-              </Chip>
-              {grouped.map(({ category, items }) => {
-                if (items.length === 0) return null;
-                const Icon = CATEGORY_ICONS[category];
-                return (
-                  <div key={category} className="flex flex-col gap-2">
-                    <span className="flex items-center gap-2 text-[11.5px] font-bold uppercase tracking-[.06em] text-faint">
-                      <Icon className="size-3.5" />
-                      {labels.nearbyCategory(category)}
-                    </span>
-                    <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-ctl)] border border-line">
-                      {items.map((place) => (
-                        <li
-                          key={`${category}-${place.name}`}
-                          className="flex items-center justify-between gap-3 px-3 py-2 text-[13px]"
-                        >
-                          <span className="truncate text-ink">{place.name}</span>
-                          <span className="shrink-0 text-[12px] text-faint tnum">
-                            {place.distance}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardBody>
-      </Card>
-      ) : null}
+      <NearbyPlacesCard />
     </>
   );
 }

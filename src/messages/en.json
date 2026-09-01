@@ -336,14 +336,27 @@
       "noPin": "No pin set yet",
       "latitude": "Latitude",
       "longitude": "Longitude",
-      "nearbyAuto": "Auto-derived from the pin",
-      "nearbyHint": "These come from a places lookup around your pin and are refreshed whenever you move it. They are not entered by hand.",
-      "nearbyEmpty": "Drop a pin to discover nearby attractions, restaurants and transit.",
-      "nearbyLoading": "Looking up nearby places…",
-      "nearbyRefresh": "Refresh nearby places",
-      "nearbyCount": "{count, plural, one {# place found} other {# places found}}",
+      "nearbyHint": "The tabs guests see on the hotel page — a café, breakfast, the mall. Same categories as a property listing.",
+      "nearbyEmpty": "Nothing under this category yet.",
       "state": "Governorate / state",
-      "village": "Village / compound"
+      "village": "Village / compound",
+      "nearbyAdd": "Add a place",
+      "nearbyName": "Place name",
+      "nearbyNamePlaceholder": "e.g. City Centre Mall",
+      "nearbyDistance": "Distance",
+      "nearbyDistanceHint": "In metres",
+      "nearbyWalk": "Walk (min)",
+      "nearbyDrive": "Drive (min)",
+      "nearbyMapsUrl": "Google Maps link",
+      "nearbyRating": "Rating",
+      "nearbyRatingHint": "Out of 5, optional",
+      "nearbyRemove": "Remove place",
+      "nearbyDescription": "Description",
+      "nearbyDescriptionHint": "One line guests read on the card",
+      "nearbyInPlan": "Part of the suggested day",
+      "nearbyPlanStep": "Step {step}",
+      "nearbyTimeOfDay": "When in the day",
+      "nearbyTimeOfDayNone": "Not set"
     },
     "amenities": {
       "title": "Hotel amenities",
@@ -838,9 +851,13 @@
       "value": "Value"
     },
     "nearbyCategories": {
-      "attraction": "Attractions",
-      "restaurant": "Restaurants",
-      "transit": "Getting around"
+      "coffee": "Start your day",
+      "breakfast": "Breakfast nearby",
+      "shopping": "Easy shopping",
+      "gifts": "Gifts & details",
+      "family": "Kids & family",
+      "entertainment": "Moments & memories",
+      "essentials": "Daily essentials"
     },
     "countries": {
       "QA": "Qatar",
@@ -957,6 +974,13 @@
       "fixedAmount": "Fixed amount",
       "percentageDiscount": "Percentage discount",
       "asAdult": "Charged as an adult"
+    },
+    "itinerarySteps": {
+      "startWithCoffee": "Start with coffee",
+      "lightBreakfast": "Light breakfast",
+      "easyShopping": "Shopping",
+      "eveningOut": "An evening out",
+      "nightCap": "Late night"
     }
   },
   "errors": {

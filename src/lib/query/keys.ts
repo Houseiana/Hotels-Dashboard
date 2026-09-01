@@ -40,7 +40,7 @@ export const queryKeys = {
   },
   places: {
     all: ['places'] as const,
-    nearby: (lat: number, lng: number, locale: string) =>
-      [...queryKeys.places.all, 'nearby', lat, lng, locale] as const,
+    /** A hotel's own nearby places, read back from the API. */
+    forHotel: (hotelId: string) => [...queryKeys.places.all, 'hotel', hotelId] as const,
   },
 } as const;

@@ -1,4 +1,5 @@
 import type { HotelDraft, RoomTypeDraft } from '../schemas/draft';
+import type { HotelNearbyPlace } from '../schemas/hotel';
 import type { HotelDetail, RoomTypeDetail } from '../schemas/hotelApi';
 import type { LookupItem } from './lookups';
 import {
@@ -21,6 +22,12 @@ import {
 } from './hotelForms';
 import { hotelsApi } from './hotels';
 import { childrenPolicyPayload, serviceRows, type SubmitLookups } from './hotelSubmit';
+import {
+  dayPlanOrders,
+  nearbyPlacePayload,
+  nearbyPlaceSignature,
+  nearbyRows,
+} from './nearbyPlaces';
 import { parseBedConfig } from '../utils';
 
 /* ---------------------------------------------------------------------------
@@ -55,7 +62,10 @@ export type EditStepKind =
   | 'roomDelete'
   | 'planCreate'
   | 'planEdit'
-  | 'planDelete';
+  | 'planDelete'
+  | 'nearbyCreate'
+  | 'nearbyEdit'
+  | 'nearbyDelete';
 
 export type EditStep = {
   kind: EditStepKind;
@@ -169,6 +179,11 @@ export async function applyHotelEdit(
   draft: HotelDraft,
   lookups: SubmitLookups,
   fallbackCurrency: string,
+  /**
+   * The hotel's nearby places as the server currently has them. Omitted — or
+   * with `before` missing because that read failed — they are left untouched.
+   */
+  nearby?: { before?: HotelNearbyPlace[] },
 ): Promise<EditResult> {
   const steps: EditStep[] = [];
   const warnings: string[] = [];
@@ -429,6 +444,51 @@ export async function applyHotelEdit(
 
   for (const room of new Set(incompletePlans)) {
     steps.push({ kind: 'planCreate', subject: room, ok: false, error: 'ratePlanIncomplete' });
+  }
+
+  /* -- 4. nearby places ------------------------------------------------------
+   * Their own three endpoints, and the hotel record does not carry them, so the
+   * caller reads them back separately and hands the list in. When it could not
+   * — the read failed — nothing here runs at all: creating against an unknown
+   * "before" would duplicate every place the hotel already has.
+   * ------------------------------------------------------------------------ */
+
+  if (nearby?.before) {
+    const before = nearby.before;
+    const after = nearbyRows(draft.nearby);
+    const kept = new Set(after.map((place) => place.id).filter(Boolean));
+
+    for (const place of before) {
+      if (!place.id || kept.has(place.id)) continue;
+      const placeId = place.id;
+      await run('nearbyDelete', place.name, () => hotelsApi.deleteNearbyPlace(placeId));
+    }
+
+    const beforeById = new Map(
+      before.flatMap((place) => (place.id ? [[place.id, place] as const] : [])),
+    );
+    const orders = dayPlanOrders(after);
+
+    for (const [index, place] of after.entries()) {
+      const step = orders.get(index);
+      const payload = nearbyPlacePayload(place, step);
+      const prior = place.id ? beforeById.get(place.id) : undefined;
+
+      if (!prior) {
+        await run('nearbyCreate', place.name, () =>
+          hotelsApi.createNearbyPlace(detail.id, payload),
+        );
+        continue;
+      }
+
+      const placeId = place.id as string;
+      // The step counts as a change: it is what the guest app's suggested day
+      // is built and ordered from.
+      const moved = (prior.displayOrder ?? undefined) !== step;
+      if (moved || nearbyPlaceSignature(place) !== nearbyPlaceSignature(prior)) {
+        await run('nearbyEdit', place.name, () => hotelsApi.editNearbyPlace(placeId, payload));
+      }
+    }
   }
 
   return { ok: steps.every((step) => step.ok), steps, warnings };

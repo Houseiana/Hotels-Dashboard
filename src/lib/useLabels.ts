@@ -42,6 +42,8 @@ export function useCatalogLabels() {
       roomService: (id: string) => label('roomServices', id),
       reviewCategory: (id: string) => label('reviewCategories', id),
       nearbyCategory: (id: string) => label('nearbyCategories', id),
+      /** A step of the guest app's suggested day — 'start with coffee', 'a night out'. */
+      itineraryStep: (id: string) => label('itinerarySteps', id),
       country: (id: string) => label('countries', id),
       city: (id: string) => label('cities', id),
       currency: (id: string) => label('currencies', id),

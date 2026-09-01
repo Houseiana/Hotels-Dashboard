@@ -92,12 +92,45 @@ export const hotelPoliciesSchema = z.object({
   smokingAllowed: z.boolean().optional(),
 });
 
-/* -- nearby (auto-derived from the map pin, never typed by the owner) ------ */
+/* -- nearby ----------------------------------------------------------------
+ *
+ * These used to be invented from the map pin and shown read-only. The API has
+ * `nearby-places` create / edit / delete now, so they are the owner's own rows
+ * and carry everything those endpoints take.
+ *
+ * `category` is a slug for a server category (or "#<id>" for one we have no
+ * translation for), NOT the old three-value enum — the server's vocabulary is
+ * coffee / breakfast / shopping / gifts / family / entertainment / essentials.
+ * The enum stays for the mock data, which still speaks the old three.
+ * ------------------------------------------------------------------------- */
 
 export const hotelNearbyPlaceSchema = z.object({
+  /** The server's id; absent on a row the owner has only just added. */
+  id: z.string().optional(),
+  /**
+   * The category's LOOKUP ID, not a slug: the categories endpoint localises
+   * its `name`, so an id is the only stable handle on which tab a place is on.
+   */
+  categoryId: z.number().optional(),
   name: z.string().min(1),
-  category: nearbyCategorySchema,
-  distance: z.string().min(1),
+  nameAr: z.string().optional(),
+  description: z.string().optional(),
+  descriptionAr: z.string().optional(),
+  /** Display text; only the mock data carries it. */
+  distance: z.string().optional(),
+  distanceMeters: z.number().nonnegative().optional(),
+  walkMinutes: z.number().nonnegative().optional(),
+  driveMinutes: z.number().nonnegative().optional(),
+  rating: z.number().min(0).max(5).optional(),
+  googleMapsUrl: z.string().optional(),
+  /** Its step in the guest app's suggested day; only planned places have one. */
+  displayOrder: z.number().optional(),
+  /** Which part of the day that step is — morning coffee, a night out. */
+  timeOfDay: z.number().optional(),
+  /** Editor-side: whether this place is part of the suggested day at all. */
+  inDayPlan: z.boolean().optional(),
+  /** The old pin-derived vocabulary, kept so the mock data still parses. */
+  category: z.string().optional(),
 });
 
 /* -- guest-generated, READ-ONLY in the dashboard --------------------------- */
