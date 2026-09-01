@@ -219,6 +219,57 @@ export const PRICING_MODE_NAMES: SlugTable = {
   asAdult: 'As Adult',
 };
 
+/**
+ * The nearby-place categories, keyed BY ID rather than by name.
+ *
+ * Every other vocabulary here matches on the server's English name, but this
+ * one must not: the categories lookup localises `name` (it answers "coffee" in
+ * English and "قهوة" in Arabic), so a name match would resolve to nothing the
+ * moment the dashboard is used in Arabic. The ids are stable across locales.
+ * This mirrors `CATEGORY_KEY_BY_ID` in the guest app's nearby-experience hook,
+ * which is where these seven come from.
+ *
+ * They are NOT the three the dashboard used to derive from the map pin
+ * (attraction / restaurant / transit) — those never existed server-side.
+ */
+export const NEARBY_CATEGORY_BY_ID: Readonly<Record<number, string>> = {
+  1: 'coffee',
+  2: 'breakfast',
+  3: 'shopping',
+  4: 'gifts',
+  5: 'family',
+  6: 'entertainment',
+  7: 'essentials',
+};
+
+/** The same emoji the guest app puts on each tab, so both read alike. */
+export const NEARBY_CATEGORY_EMOJI: Readonly<Record<number, string>> = {
+  1: '☕',
+  2: '🍳',
+  3: '🛍️',
+  4: '🎁',
+  5: '👨‍👩‍👧‍👦',
+  6: '🎮',
+  7: '🧴',
+};
+
+/**
+ * `timeOfDay` labels the guest app's "your day here" itinerary by.
+ *
+ * It reads them as names (MORNING … NIGHT) but the hotel write DTO takes an
+ * integer, and the API documents no mapping — this is the enum's declared
+ * order, which is the only sensible reading of it. Nothing is sent unless the
+ * owner picks a step, so a wrong guess mislabels an itinerary card rather than
+ * corrupting a place.
+ */
+export const NEARBY_TIME_OF_DAY: ReadonlyArray<{ id: number; slug: string }> = [
+  { id: 1, slug: 'startWithCoffee' },
+  { id: 2, slug: 'lightBreakfast' },
+  { id: 3, slug: 'easyShopping' },
+  { id: 4, slug: 'eveningOut' },
+  { id: 5, slug: 'nightCap' },
+];
+
 /** The two modes the API rejects a `value` for. */
 export const PRICING_MODES_WITHOUT_VALUE = ['free', 'asAdult'] as const;
 

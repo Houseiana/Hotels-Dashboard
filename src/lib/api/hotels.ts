@@ -1,15 +1,17 @@
 import { z } from 'zod';
-import type { Hotel, HotelNearbyPlace, HotelReview } from '../schemas/hotel';
+import type { Hotel, HotelReview } from '../schemas/hotel';
 import {
+  apiNearbyPlaceSchema,
   hotelDetailSchema,
   hotelListSchema,
+  type ApiNearbyPlace,
   type HotelDetail,
   type HotelListItem,
+  type NearbyPlacePayload,
 } from '../schemas/hotelApi';
 import { request, requestData, USE_MOCK, type Pagination } from './config';
 import type { RatePlanPayload } from './hotelForms';
 import * as mock from '../mock/db';
-import { lookupNearbyPlaces } from '../mock/places';
 
 export type HotelListQuery = {
   /**
@@ -282,6 +284,56 @@ export const hotelsApi = {
     await request(`/api/rate-plans/${ratePlanId}/delete`, z.unknown(), { method: 'POST' });
   },
 
+  /* -- nearby places ---------------------------------------------------------
+   *
+   * `GET /api/hotels/{hotelId}/nearby-places` REQUIRES `categoryId`: called
+   * without one it answers 404 "Category not found." (verified against the live
+   * API). So reading a hotel's whole list means one call per category — pass
+   * the ids from the NearbyCategories lookup. Worth asking the backend to make
+   * the parameter optional; this fan-out goes away the day it is.
+   * ------------------------------------------------------------------------ */
+
+  async nearbyPlaces(hotelId: string, categoryIds: number[]): Promise<ApiNearbyPlace[]> {
+    if (USE_MOCK) return [];
+    const perCategory = await Promise.all(
+      categoryIds.map(async (categoryId) => {
+        try {
+          return await requestData(
+            `/api/hotels/${hotelId}/nearby-places`,
+            z.array(apiNearbyPlaceSchema),
+            { query: { categoryId } },
+          ).then((result) => result.data.map((place) => ({ ...place, categoryId })));
+        } catch {
+          // One category failing must not cost the owner the other six.
+          return [];
+        }
+      }),
+    );
+    return perCategory
+      .flat()
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+  },
+
+  /** `POST /api/hotels/{hotelId}/nearby-places/create` — JSON, not multipart. */
+  async createNearbyPlace(hotelId: string, body: NearbyPlacePayload): Promise<void> {
+    await request(`/api/hotels/${hotelId}/nearby-places/create`, z.unknown(), {
+      method: 'POST',
+      body,
+    });
+  },
+
+  /** `POST /api/nearby-places/{placeId}/edit` — every field is nullable. */
+  async editNearbyPlace(placeId: string, body: NearbyPlacePayload): Promise<void> {
+    await request(`/api/nearby-places/${placeId}/edit`, z.unknown(), {
+      method: 'POST',
+      body,
+    });
+  },
+
+  async deleteNearbyPlace(placeId: string): Promise<void> {
+    await request(`/api/nearby-places/${placeId}/delete`, z.unknown(), { method: 'POST' });
+  },
+
   /* -- NOT YET MIGRATED ------------------------------------------------------
    * These back the wizard, Overview and Reviews, which still speak the shared
    * guest model. They stay on the mock regardless of NEXT_PUBLIC_USE_MOCK so
@@ -308,10 +360,5 @@ export const hotelsApi = {
   /** Real endpoint: POST /api/hotels/reviews/{reviewId}/reply { reply } */
   replyToReview(hotelId: string, reviewId: string, reply: string): Promise<HotelReview> {
     return mock.replyToReview(hotelId, reviewId, reply);
-  },
-
-  /** `nearby[]` is derived from the pin; the API has no equivalent — see API_SUPPORTS. */
-  nearby(latitude: number, longitude: number, locale: string): Promise<HotelNearbyPlace[]> {
-    return lookupNearbyPlaces(latitude, longitude, locale);
   },
 };

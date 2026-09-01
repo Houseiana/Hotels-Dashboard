@@ -479,3 +479,61 @@ export const hotelFeeSchema = z.object({
 });
 
 export type HotelFee = z.infer<typeof hotelFeeSchema>;
+
+/**
+ * `GET /api/hotels/{hotelId}/nearby-places?categoryId=<id>`.
+ *
+ * The write DTO is documented (`CreateHotelNearbyPlaceDto`); the read is not,
+ * and the QA account has no place to read back, so this accepts the write
+ * spelling (`nameAR`) alongside the one the rest of the API's reads use
+ * (`nameAr`), and both `id` and `placeId` for the key. Unknown keys survive.
+ * Whichever pair the server actually sends, the mapper below finds it.
+ */
+export const apiNearbyPlaceSchema = z
+  .object({
+    id: z.string().nullable().optional(),
+    placeId: z.string().nullable().optional(),
+    categoryId: z.number().nullable().optional(),
+    categoryName: z.string().nullable().optional(),
+    name: z.string().nullable().optional(),
+    nameAr: z.string().nullable().optional(),
+    nameAR: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    descriptionAr: z.string().nullable().optional(),
+    descriptionAR: z.string().nullable().optional(),
+    rating: z.number().nullable().optional(),
+    reviewCount: z.number().nullable().optional(),
+    distanceMeters: z.number().nullable().optional(),
+    walkMinutes: z.number().nullable().optional(),
+    driveMinutes: z.number().nullable().optional(),
+    googleMapsUrl: z.string().nullable().optional(),
+    priceLevel: z.number().nullable().optional(),
+    displayOrder: z.number().nullable().optional(),
+    timeOfDay: z.number().nullable().optional(),
+  })
+  .loose();
+
+export type ApiNearbyPlace = z.infer<typeof apiNearbyPlaceSchema>;
+
+/**
+ * The body both `nearby-places/create` and `nearby-places/{id}/edit` take.
+ *
+ * Note `nameAR` / `descriptionAR`: the API capitalises the suffix here, unlike
+ * the hotel and room-type forms, which use `nameAr`.
+ */
+export type NearbyPlacePayload = {
+  categoryId?: number;
+  name?: string;
+  nameAR?: string;
+  description?: string;
+  descriptionAR?: string;
+  rating?: number;
+  reviewCount?: number;
+  distanceMeters?: number;
+  walkMinutes?: number;
+  driveMinutes?: number;
+  googleMapsUrl?: string;
+  priceLevel?: number;
+  displayOrder?: number;
+  timeOfDay?: number;
+};

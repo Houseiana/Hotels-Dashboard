@@ -319,7 +319,7 @@
       "subtitle": "حدّد العنوان وضع الدبوس — وسنعثر على الأماكن القريبة نيابةً عنك.",
       "cardAddress": "العنوان",
       "cardPin": "دبوس الخريطة",
-      "cardNearby": "الأماكن القريبة",
+      "cardNearby": "اللي حوالين الفندق",
       "address": "عنوان الشارع",
       "addressPlaceholder": "مثال: ١٢٣ شارع الكورنيش",
       "buildingNo": "رقم المبنى",
@@ -336,14 +336,27 @@
       "noPin": "لم يُوضع دبوس بعد",
       "latitude": "خط العرض",
       "longitude": "خط الطول",
-      "nearbyAuto": "مستنتجة تلقائيًا من الدبوس",
-      "nearbyHint": "تأتي هذه الأماكن من بحث حول الدبوس وتُحدَّث كلما حرّكته. لا تُدخل يدويًا.",
-      "nearbyEmpty": "ضع دبوسًا لاكتشاف المعالم والمطاعم ووسائل النقل القريبة.",
-      "nearbyLoading": "جارٍ البحث عن الأماكن القريبة…",
-      "nearbyRefresh": "تحديث الأماكن القريبة",
-      "nearbyCount": "{count, plural, zero {لا أماكن} one {مكان واحد} two {مكانان} few {# أماكن} many {# مكانًا} other {# مكان}} تم العثور عليه",
+      "nearbyHint": "دي التابات اللي الضيف بيشوفها في صفحة الفندق — كافيه، فطار، مول. نفس تصنيفات الشقق.",
+      "nearbyEmpty": "مفيش حاجة تحت التصنيف ده لسه.",
       "state": "المحافظة",
-      "village": "القرية / الكمبوند"
+      "village": "القرية / الكمبوند",
+      "nearbyAdd": "إضافة مكان",
+      "nearbyName": "اسم المكان",
+      "nearbyNamePlaceholder": "مثال: سيتي سنتر مول",
+      "nearbyDistance": "المسافة",
+      "nearbyDistanceHint": "بالمتر",
+      "nearbyWalk": "مشي (دقيقة)",
+      "nearbyDrive": "بالعربية (دقيقة)",
+      "nearbyMapsUrl": "لينك خرايط جوجل",
+      "nearbyRating": "التقييم",
+      "nearbyRatingHint": "من ٥، اختياري",
+      "nearbyRemove": "حذف المكان",
+      "nearbyDescription": "الوصف",
+      "nearbyDescriptionHint": "سطر واحد بيظهر للضيف على الكارت",
+      "nearbyInPlan": "ضمن اقتراح اليوم",
+      "nearbyPlanStep": "الخطوة {step}",
+      "nearbyTimeOfDay": "وقته في اليوم",
+      "nearbyTimeOfDayNone": "مش محدد"
     },
     "amenities": {
       "title": "مرافق الفندق",
@@ -838,9 +851,13 @@
       "value": "مقابل السعر"
     },
     "nearbyCategories": {
-      "attraction": "المعالم",
-      "restaurant": "المطاعم",
-      "transit": "وسائل النقل"
+      "coffee": "ابدأ يومك بهدوء",
+      "breakfast": "أماكن إفطار قريبة",
+      "shopping": "تسوّق بسهولة",
+      "gifts": "تفاصيل وهدايا",
+      "family": "للأطفال والعائلة",
+      "entertainment": "لحظات وذكريات",
+      "essentials": "ضروريات يومية"
     },
     "countries": {
       "QA": "قطر",
@@ -957,6 +974,13 @@
       "fixedAmount": "مبلغ ثابت",
       "percentageDiscount": "خصم بنسبة",
       "asAdult": "يُحسب كبالغ"
+    },
+    "itinerarySteps": {
+      "startWithCoffee": "ابدأ بقهوة",
+      "lightBreakfast": "إفطار خفيف",
+      "easyShopping": "تسوّق",
+      "eveningOut": "سهرة قريبة",
+      "nightCap": "في وقت متأخر"
     }
   },
   "errors": {

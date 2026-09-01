@@ -56,6 +56,7 @@ export const LOOKUP_PATHS = {
   amenities: '/api/HotelManagementLookup/Amenities',
   roomAmenities: '/api/HotelManagementLookup/RoomAmenities',
   countries: '/api/HotelManagementLookup/Countries',
+  nearbyCategories: '/api/HotelManagementLookup/NearbyCategories',
 } as const;
 
 export type LookupName = keyof typeof LOOKUP_PATHS;
