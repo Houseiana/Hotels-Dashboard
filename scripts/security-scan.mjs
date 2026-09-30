@@ -155,7 +155,8 @@ for (const full of walk(ROOT)) {
 
   const isConfig = CONFIG_FILE.test(name);
   if (!CODE_EXT.has(ext) && !isConfig) continue;
-  const lines = buf.toString('utf8').split(/\r?\n/);
+  const text = buf.toString('utf8');
+  const lines = text.split(/\r?\n/);
 
   if (CODE_EXT.has(ext)) {
     // 4. Code hidden after a long run of spaces, so it sits off-screen.
@@ -164,8 +165,11 @@ for (const full of walk(ROOT)) {
     if (lines.some((line) => /\S {80,}\S/.test(line))) {
       report(file, 'Code hidden after a long run of spaces');
     }
-    // 5. Obfuscator output: identifiers like _0x followed by hex digits.
-    if (lines.some((line) => /_0x[0-9a-f]{4,}/.test(line))) {
+    // 5. Obfuscator output: many identifiers like _0x followed by 4-6 hex
+    // digits. The payload has hundreds; a threshold keeps one-off constants
+    // such as the _0x80040111 Firefox error code in old jQuery from matching.
+    const obfuscated = text.match(/(?<![\w$])_0x[0-9a-f]{4,6}(?![\w$])/g);
+    if (obfuscated && obfuscated.length >= 10) {
       report(file, 'Obfuscated identifiers (_0x...) found');
     }
   }
@@ -201,4 +205,4 @@ if (failed) {
   );
   process.exit(1);
 }
-console.log('Security scan passed.');
+console.log('🔐 Security scan passed  ✅');
