@@ -1,0 +1,29 @@
+name: Security scan
+
+# Blocks the "fake font" malware from coming back (see scripts/security-scan.mjs).
+# Runs on every push and PR, on every branch, since the attack force-pushed
+# rewritten commits straight to shared branches.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # No npm install and no build here on purpose: installing or building an
+      # infected checkout is exactly what runs the payload.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Scan for injected or disguised code
+        run: node scripts/security-scan.mjs

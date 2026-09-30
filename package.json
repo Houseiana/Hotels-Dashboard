@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "security:scan": "node scripts/security-scan.mjs",
+    "predev": "npm run security:scan",
     "dev": "next dev",
+    "prebuild": "npm run security:scan",
     "build": "next build",
     "start": "next start",
     "lint": "eslint src",
